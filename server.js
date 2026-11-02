@@ -79,7 +79,7 @@ function calculateExpiry(endDateStr, todayStr = '2026-10-28') {
 // --------------------------------------------------------------------------
 // HTTP SERVER & ROUTER
 // --------------------------------------------------------------------------
-const server = http.createServer(async (req, res) => {
+export async function requestHandler(req, res) {
   // CORS Preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -725,8 +725,14 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': contentType });
     fs.createReadStream(filePath).pipe(res);
   });
-});
+}
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Ethiopost Marketing Command Center running at http://0.0.0.0:${PORT}/`);
-});
+const server = http.createServer(requestHandler);
+
+if (!process.env.VERCEL) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Ethiopost Marketing Command Center running at http://0.0.0.0:${PORT}/`);
+  });
+}
+
+export default requestHandler;
