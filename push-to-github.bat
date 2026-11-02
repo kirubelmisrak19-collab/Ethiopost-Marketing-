@@ -22,11 +22,13 @@ echo     %DEFAULT_REPO%
 echo.
 echo Choose authentication method:
 echo   [1] Automatic Browser / Git Login (Default)
-echo   [2] Paste GitHub Personal Access Token (Bypasses password errors)
+echo   [2] Paste GitHub Personal Access Token (Recommended - Bypasses password errors)
 echo   [3] Change Repository URL
 echo.
-set /p CHOICE="Select option (1, 2, or 3) [Default: 1]: "
+set /p CHOICE="Select option (1, 2, or 3) [Default: 2]: "
+if "%CHOICE%"=="" set "CHOICE=2"
 
+if "%CHOICE%"=="1" goto :DEFAULT_PUSH
 if "%CHOICE%"=="2" goto :USE_TOKEN
 if "%CHOICE%"=="3" goto :CUSTOM_URL
 
@@ -41,10 +43,12 @@ goto :DO_PUSH
 
 :USE_TOKEN
 echo.
-echo Note: Create a token at GitHub -> Settings -> Developer Settings -> Personal access tokens
-echo (Select 'Tokens classic' and check the 'repo' permission box).
+echo ----------------------------------------------------------------------
+echo  Get a 30-second token here: https://github.com/settings/tokens/new
+echo  (Name it "deploy" and check the "repo" checkbox)
+echo ----------------------------------------------------------------------
 echo.
-set /p GHTOKEN="Paste your GitHub Token: "
+set /p GHTOKEN="Paste your GitHub Token (ghp_...): "
 if "%GHTOKEN%"=="" (
     echo [ERROR] Token cannot be empty.
     pause
@@ -62,25 +66,21 @@ git remote add origin %TARGET_URL%
 echo [2/3] Setting branch to main...
 git branch -M main
 
-echo [3/3] Uploading code to GitHub...
+echo [3/3] Uploading all files and folders to GitHub...
 echo.
-git push -u origin main
+git push -u origin main --force
 
 if %ERRORLEVEL% equ 0 (
     echo.
     echo ======================================================================
-    echo   SUCCESS! All 26 files have been uploaded to your GitHub repository!
-    echo   Render or Railway will now automatically detect your code and build.
+    echo   SUCCESS! All files and folders (including public/ and vercel.json)
+    echo   have been cleanly synced to GitHub!
+    echo   Vercel will now automatically trigger a successful build!
     echo ======================================================================
 ) else (
     echo.
     echo ======================================================================
-    echo   [NOTICE] Git Push could not authenticate.
-    echo.
-    echo   EASIEST 30-SECOND ALTERNATIVE:
-    echo   1. Open: https://github.com/kirubelmisrak19-collab/Ethiopost-Marketing-
-    echo   2. Click "uploading an existing file"
-    echo   3. Drag and drop all files from this folder and click "Commit changes"!
+    echo   [ERROR] Git push failed. Please verify your token and try again.
     echo ======================================================================
 )
 
