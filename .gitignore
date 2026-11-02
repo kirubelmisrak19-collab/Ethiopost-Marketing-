@@ -3,5 +3,7 @@ data/*.sqlite*
 data/*.db*
 scratch/
 *.log
+*.zip
+*.exe
 .DS_Store
 Thumbs.db
