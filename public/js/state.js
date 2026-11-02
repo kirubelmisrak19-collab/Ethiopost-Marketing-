@@ -71,6 +71,10 @@ export async function api(endpoint, options = {}) {
     if (contentType.includes('application/json')) {
       return await res.json();
     }
+    if (endpoint.startsWith('/api/')) {
+      const text = await res.text();
+      try { return JSON.parse(text); } catch (e) { throw new Error('API non-JSON response (' + res.status + '): ' + text.substring(0, 80)); }
+    }
     return await res.text();
   } catch (err) {
     showToast(err.message, 'error');

@@ -16,6 +16,7 @@ export async function renderOverview(container) {
 
   try {
     const data = await api(`/api/overview?month=${state.activeMonth}&date=2026-10-28`);
+    if (!data || !data.kpis) throw new Error('Invalid overview data received from server');
     const { kpis, monthlyCampaigns, liveAdsSnapshot, attentionRequired } = data;
 
     container.innerHTML = `

@@ -9,7 +9,7 @@
     "test": "node test.js"
   },
   "engines": {
-    "node": ">=22.5.0"
+    "node": "22.x"
   },
   "author": "Ethiopost Marketing & Communication Department",
   "license": "UNLICENSED"
