@@ -645,6 +645,29 @@ export async function requestHandler(req, res) {
         return sendJson(res, 200, { users, approvals });
       }
 
+      if (pathname === '/api/team' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        if (!body.name || !body.role) {
+          return sendJson(res, 400, { error: 'Name and role are required' });
+        }
+        const id = `USR-${Date.now().toString().slice(-4)}`;
+        const avatar = body.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        db.prepare(`
+          INSERT INTO users (id, name, email, role, department, status, avatar)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          id,
+          body.name,
+          body.email || `${body.name.toLowerCase().replace(/\s+/g, '.')}@ethiopost.et`,
+          body.role,
+          body.department || 'Marketing Operations',
+          'Active',
+          avatar
+        );
+        const newUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+        return sendJson(res, 201, newUser);
+      }
+
       const approvalDecideMatch = pathname.match(/^\/api\/approvals\/([^\/]+)\/decide$/);
       if (approvalDecideMatch && method === 'POST') {
         const requestId = approvalDecideMatch[1];

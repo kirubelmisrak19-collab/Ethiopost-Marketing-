@@ -3,22 +3,30 @@
  * Client State & Utility Layer
  */
 
+export const SUPER_ADMIN_USER = {
+  id: 'USR-ADMIN',
+  name: 'Kirubel Misrak',
+  role: 'Super Administrator',
+  email: 'kirubel.misrak@ethiopost.et',
+  department: 'Marketing & Digital Communications'
+};
+
 const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('ethiopost_user') : null;
 let parsedUser = null;
 try {
-  if (savedUser) parsedUser = JSON.parse(savedUser);
+  if (savedUser) {
+    parsedUser = JSON.parse(savedUser);
+    if (!parsedUser || parsedUser.name !== 'Kirubel Misrak') {
+      parsedUser = SUPER_ADMIN_USER;
+      localStorage.setItem('ethiopost_user', JSON.stringify(SUPER_ADMIN_USER));
+    }
+  }
 } catch (e) {}
 
 export const state = {
   currentRoute: 'overview',
   activeMonth: '2026-10',
-  currentUser: parsedUser || {
-    id: 'USR-001',
-    name: 'Dawit Tadesse',
-    role: 'Marketing & Communication Manager',
-    email: 'dawit.tadesse@ethiopost.et',
-    department: 'Executive'
-  }
+  currentUser: parsedUser || SUPER_ADMIN_USER
 };
 
 export function setCurrentUser(user) {

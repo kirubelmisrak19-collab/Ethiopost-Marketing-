@@ -55,7 +55,7 @@ export async function initModals() {
               </div>
               <div class="form-group">
                 <label class="form-label">Campaign Owner</label>
-                <input type="text" id="cmp-owner" class="form-input" value="Dawit Tadesse" required>
+                <input type="text" id="cmp-owner" class="form-input" value="${state.currentUser ? state.currentUser.name : 'Kirubel Misrak'}" required>
               </div>
             </div>
             <div class="form-grid-2">
@@ -174,7 +174,7 @@ export async function initModals() {
             </div>
             <div class="form-group">
               <label class="form-label">Verified By</label>
-              <input type="text" id="vf-user" class="form-input" value="Dawit Tadesse" required>
+              <input type="text" id="vf-user" class="form-input" value="${state.currentUser ? state.currentUser.name : 'Kirubel Misrak'}" required>
             </div>
           </div>
           <div class="modal-footer">

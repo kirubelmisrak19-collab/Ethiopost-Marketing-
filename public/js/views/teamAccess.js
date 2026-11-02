@@ -85,6 +85,9 @@ export async function renderTeamAccess(container) {
             <div class="card-title">Marketing & Communication Team Members (${users.length})</div>
             <div class="card-subtitle">Active staff directory across executive, campaign, and digital marketing roles</div>
           </div>
+          <button class="btn btn-primary btn-sm" onclick="window.openAddUserModal()">
+            + Add Team Member
+          </button>
         </div>
         <div class="table-container">
           <table class="data-table">
@@ -154,4 +157,25 @@ window.handleApprovalAction = async function(id, action, requester) {
     showToast(`Request ${id} ${action.toLowerCase()} successfully by ${actorName}`, 'success');
     window.router.handleRoute();
   } catch (err) {}
+};
+
+window.openAddUserModal = async function() {
+  const name = prompt("Enter new team member's full name:");
+  if (!name || !name.trim()) return;
+  const role = prompt("Enter team role (e.g. Campaign Supervisor, Pricing Specialist, Marketing Officer):", "Marketing Officer");
+  if (!role || !role.trim()) return;
+  const email = prompt("Enter email address:", name.trim().toLowerCase().replace(/\s+/g, '.') + "@ethiopost.et");
+  
+  try {
+    await api('/api/team', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim(), role: role.trim(), email: email ? email.trim() : undefined })
+    });
+    showToast("Team member " + name.trim() + " added successfully!", 'success');
+    if (typeof window !== 'undefined' && window.router) {
+      window.router.handleRoute();
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 };
