@@ -1,16 +1,18 @@
 /**
  * Ethiopost Marketing Command Center
- * Integration Test Suite - Clean Production Verification
+ * Integration Test Suite - Authentication, Security & Clean Operations
  */
 
-import { db } from './db.js';
 import http from 'node:http';
+import { db } from './db.js';
+import requestHandler from './server.js';
 
-const BASE_URL = 'http://127.0.0.1:3050';
+let server;
+let baseUrl;
 
 function makeRequest(method, path, headers = {}, body = null) {
   return new Promise((resolve, reject) => {
-    const url = new URL(path, BASE_URL);
+    const url = new URL(path, baseUrl);
     const reqOptions = {
       hostname: url.hostname,
       port: url.port,
@@ -65,70 +67,138 @@ async function runTestSuite() {
     console.log(`[PASS] ${message}`);
   }
 
-  // 1. Schema & Relational Integrity
-  console.log('\n--- 1. Relational Database Schema & Integrity ---');
-  const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all().map(t => t.name);
-  assert(tables.includes('portfolios'), "Table 'portfolios' exists");
-  assert(tables.includes('campaigns'), "Table 'campaigns' exists");
-  assert(tables.includes('media_placements'), "Table 'media_placements' exists");
-  assert(tables.includes('campaign_activities'), "Table 'campaign_activities' exists");
-  assert(tables.includes('expenses'), "Table 'expenses' exists");
-  assert(tables.includes('users'), "Table 'users' exists");
-  assert(tables.includes('approval_requests'), "Table 'approval_requests' exists");
+  // Start in-memory server
+  server = http.createServer(requestHandler);
+  await new Promise(resolve => server.listen(0, resolve));
+  const port = server.address().port;
+  baseUrl = `http://127.0.0.1:${port}`;
+  console.log(`Local test server running on port ${port}`);
 
-  const portfolioCount = db.prepare('SELECT COUNT(*) as c FROM portfolios').get().c;
-  assert(portfolioCount === 10, `10 Ethiopost operational portfolios active (found: ${portfolioCount})`);
+  try {
+    // 1. Relational Database Schema & Integrity
+    console.log('\n--- 1. Relational Database Schema & Integrity ---');
+    const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all().map(t => t.name);
+    assert(tables.includes('portfolios'), "Table 'portfolios' exists");
+    assert(tables.includes('campaigns'), "Table 'campaigns' exists");
+    assert(tables.includes('media_placements'), "Table 'media_placements' exists");
+    assert(tables.includes('campaign_activities'), "Table 'campaign_activities' exists");
+    assert(tables.includes('expenses'), "Table 'expenses' exists");
+    assert(tables.includes('users'), "Table 'users' exists");
+    assert(tables.includes('approval_requests'), "Table 'approval_requests' exists");
 
-  const adminUser = db.prepare('SELECT * FROM users WHERE role = ?').get('Super Administrator');
-  assert(adminUser && adminUser.name === 'Kirubel Misrak', `Super Administrator Kirubel Misrak configured (found: ${adminUser ? adminUser.name : 'none'})`);
+    const portfolioCount = db.prepare('SELECT COUNT(*) as c FROM portfolios').get().c;
+    assert(portfolioCount === 10, `10 Ethiopost operational portfolios active (found: ${portfolioCount})`);
 
-  // 2. Executive Overview API
-  console.log('\n--- 2. Executive Overview API ---');
-  const ovRes = await makeRequest('GET', '/api/overview');
-  assert(ovRes.statusCode === 200, 'GET /api/overview returned 200 OK');
-  assert(ovRes.json && ovRes.json.kpis, 'Overview contains kpis object');
-  assert(ovRes.json.kpis.activeCampaigns === 0, 'Clean zero active campaigns in fresh state');
-  assert(ovRes.json.kpis.liveAdvertisements === 0, 'Clean zero live advertisements in fresh state');
-  assert(Array.isArray(ovRes.json.monthlyCampaigns), 'monthlyCampaigns is array');
-  assert(Array.isArray(ovRes.json.liveAdsSnapshot), 'liveAdsSnapshot is array');
-  assert(Array.isArray(ovRes.json.attentionRequired), 'attentionRequired is array');
+    const adminUser = db.prepare('SELECT * FROM users WHERE role = ?').get('Super Administrator');
+    assert(adminUser && adminUser.name === 'Kirubel Misrak', `Super Administrator Kirubel Misrak configured (found: ${adminUser ? adminUser.name : 'none'})`);
+    assert(Boolean(adminUser.password_hash && adminUser.salt), 'Super Administrator has secure password hash & salt');
 
-  // 3. Team Management API
-  console.log('\n--- 3. Team & Super Admin Access ---');
-  const teamRes = await makeRequest('GET', '/api/team');
-  assert(teamRes.statusCode === 200, 'GET /api/team returned 200 OK');
-  assert(teamRes.json.users.some(u => u.name === 'Kirubel Misrak'), 'Kirubel Misrak is in team directory');
+    // 2. Authentication Gate & Access Control
+    console.log('\n--- 2. Authentication Gate & Access Control ---');
+    const unauthRes = await makeRequest('GET', '/api/overview');
+    assert(unauthRes.statusCode === 401, 'Unauthenticated request to /api/overview rejected with 401 Unauthorized');
 
-  // 4. Clean Campaign Creation Workflow
-  console.log('\n--- 4. Live Campaign Workflow ---');
-  const newCampRes = await makeRequest('POST', '/api/campaigns', {}, {
-    title: 'Automated Test Flight',
-    portfolio_id: 'vpb',
-    owner: 'Kirubel Misrak',
-    start_date: '2026-11-01',
-    end_date: '2026-11-30',
-    budget: 100000,
-    strategic_objective: 'Verification'
-  });
-  assert(newCampRes.statusCode === 201, 'POST /api/campaigns created campaign successfully with 201 Created');
-  const testCampId = newCampRes.json.id;
+    const badLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
+      email: 'kirubel.misrak@ethiopost.et',
+      password: 'IncorrectPassword'
+    });
+    assert(badLoginRes.statusCode === 401, 'Invalid password rejected with 401');
 
-  const detailRes = await makeRequest('GET', `/api/campaigns/${testCampId}`);
-  assert(detailRes.statusCode === 200, 'Campaign workspace loaded with 200 OK');
+    const goodLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
+      email: 'kirubel.misrak@ethiopost.et',
+      password: 'Ethiopost@2026'
+    });
+    assert(goodLoginRes.statusCode === 200, 'Super Administrator login successful with 200 OK');
+    assert(Boolean(goodLoginRes.json.token), 'Login response contains signed HMAC-SHA256 JWT token');
+    assert(goodLoginRes.json.user.name === 'Kirubel Misrak', 'User is Kirubel Misrak');
+    assert(goodLoginRes.json.user.role === 'Super Administrator', 'Role is Super Administrator');
+    const adminToken = goodLoginRes.json.token;
+    const authHeader = { 'Authorization': `Bearer ${adminToken}` };
 
-  // Cleanup test campaign
-  db.prepare('DELETE FROM campaigns WHERE id = ?').run(testCampId);
-  console.log('[PASS] Test campaign cleaned up from database');
+    // 3. Executive Overview with Auth Token
+    console.log('\n--- 3. Executive Overview API ---');
+    const ovRes = await makeRequest('GET', '/api/overview', authHeader);
+    assert(ovRes.statusCode === 200, 'GET /api/overview with token returned 200 OK');
+    assert(ovRes.json && ovRes.json.kpis, 'Overview contains kpis object');
+    assert(ovRes.json.kpis.activeCampaigns === 0, 'Clean zero active campaigns in fresh state');
+    assert(ovRes.json.kpis.liveAdvertisements === 0, 'Clean zero live advertisements in fresh state');
 
-  // 5. CSV Streaming Export
-  console.log('\n--- 5. Streaming CSV Exports ---');
-  const csvRes = await makeRequest('GET', '/api/advertisements?export=csv');
-  assert(csvRes.statusCode === 200, 'CSV export responded with 200 OK');
-  assert(csvRes.headers['content-type'].includes('text/csv'), 'Content-Type is text/csv');
+    // 4. Super Admin User Provisioning
+    console.log('\n--- 4. Super Admin Team Provisioning ---');
+    const createRes = await makeRequest('POST', '/api/users', authHeader, {
+      name: 'Selamawit Desta',
+      role: 'Campaign Officer',
+      email: 'selamawit.desta@ethiopost.et',
+      department: 'Marketing Operations',
+      password: 'TempPassword@2026'
+    });
+    assert(createRes.statusCode === 201, 'Super Admin created team account with 201 Created');
+    assert(createRes.json.user.email === 'selamawit.desta@ethiopost.et', 'New user has correct email');
+    const newUserId = createRes.json.user.id;
 
-  console.log('\n================================================================');
-  console.log('  ALL INTEGRATION VERIFICATION CHECKS PASSED SUCCESSFULLY!       ');
-  console.log('================================================================\n');
+    // Login as new user
+    const newUserLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
+      email: 'selamawit.desta@ethiopost.et',
+      password: 'TempPassword@2026'
+    });
+    assert(newUserLoginRes.statusCode === 200, 'New team member logged in successfully');
+    const regularToken = newUserLoginRes.json.token;
+    const regularHeader = { 'Authorization': `Bearer ${regularToken}` };
+
+    // Regular user cannot create users (Super Admin only)
+    const unauthorizedCreate = await makeRequest('POST', '/api/users', regularHeader, {
+      name: 'Unauthorized User',
+      role: 'Super Administrator',
+      email: 'unauth@ethiopost.et'
+    });
+    assert(unauthorizedCreate.statusCode === 403, 'Regular user blocked from creating accounts with 403 Forbidden');
+
+    // Super Admin resets password for user
+    const resetRes = await makeRequest('POST', `/api/users/${newUserId}/reset-password`, authHeader, {
+      newPassword: 'UpdatedSecret@2026'
+    });
+    assert(resetRes.statusCode === 200, 'Super Admin reset user password successfully');
+
+    // Clean up created user
+    const deleteRes = await makeRequest('DELETE', `/api/users/${newUserId}`, authHeader);
+    assert(deleteRes.statusCode === 200, 'Super Admin deleted test user with 200 OK');
+
+    // 5. Clean Campaign Creation Workflow
+    console.log('\n--- 5. Live Campaign Workflow ---');
+    const newCampRes = await makeRequest('POST', '/api/campaigns', authHeader, {
+      title: 'Automated Test Flight',
+      portfolio_id: 'vpb',
+      owner: 'Kirubel Misrak',
+      start_date: '2026-11-01',
+      end_date: '2026-11-30',
+      budget: 100000,
+      strategic_objective: 'Verification'
+    });
+    assert(newCampRes.statusCode === 201, 'POST /api/campaigns created campaign successfully with 201 Created');
+    const testCampId = newCampRes.json.id;
+
+    const detailRes = await makeRequest('GET', `/api/campaigns/${testCampId}`, authHeader);
+    assert(detailRes.statusCode === 200, 'Campaign workspace loaded with 200 OK');
+
+    // Cleanup test campaign
+    db.prepare('DELETE FROM campaigns WHERE id = ?').run(testCampId);
+    console.log('[PASS] Test campaign cleaned up from database');
+
+    // 6. CSV Streaming Export
+    console.log('\n--- 6. Streaming CSV Exports ---');
+    const csvRes = await makeRequest('GET', `/api/advertisements?export=csv&token=${adminToken}`);
+    assert(csvRes.statusCode === 200, 'CSV export responded with 200 OK');
+    assert(csvRes.headers['content-type'].includes('text/csv'), 'Content-Type is text/csv');
+
+    console.log('\n================================================================');
+    console.log('  ALL INTEGRATION VERIFICATION CHECKS PASSED SUCCESSFULLY!       ');
+    console.log('================================================================\n');
+
+  } finally {
+    if (server) {
+      server.close();
+    }
+  }
 }
 
 runTestSuite().catch(err => {

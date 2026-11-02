@@ -1,9 +1,9 @@
 /**
  * Ethiopost Marketing Command Center
- * Client Application Shell & Router
+ * Client Application Shell, Authentication Lifecycle & Router
  */
 
-import { state, api, updateUserUI, setCurrentUser } from './state.js';
+import { state, api, updateUserUI, setAuthSession, clearAuthSession, isLoggedIn, showToast } from './state.js';
 import { icons } from './components/icons.js';
 import { initModals } from './components/modals.js';
 
@@ -28,6 +28,11 @@ class Router {
   }
 
   async handleRoute() {
+    if (!isLoggedIn()) {
+      window.showLoginGate();
+      return;
+    }
+
     let hash = window.location.hash.slice(1) || '/overview';
     if (!hash.startsWith('/')) hash = '/' + hash;
 
@@ -108,8 +113,8 @@ class Router {
 
     if (hash === '/team') {
       if (pageTitle) pageTitle.textContent = 'Team Directory & Governance';
-      if (primaryLabel) primaryLabel.textContent = '+ New Campaign';
-      if (primaryBtn) primaryBtn.onclick = () => window.openModal('campaign-modal');
+      if (primaryLabel) primaryLabel.textContent = '+ Provision Account';
+      if (primaryBtn) primaryBtn.onclick = () => window.openProvisionUserModal();
       return renderTeamAccess(this.container);
     }
 
@@ -125,8 +130,126 @@ class Router {
   }
 }
 
-// Bootstrap Application
-async function bootstrapApp() {
+// --------------------------------------------------------------------------
+// GLOBAL AUTHENTICATION GATE & LOGIN CONTROLLER
+// --------------------------------------------------------------------------
+
+window.showLoginGate = function(alertMessage = null) {
+  const loginGate = document.getElementById('login-gate');
+  const appRoot = document.getElementById('app-root');
+  const loginAlert = document.getElementById('login-alert');
+
+  if (loginGate) loginGate.style.display = 'flex';
+  if (appRoot) appRoot.style.display = 'none';
+
+  if (loginAlert) {
+    if (alertMessage) {
+      loginAlert.textContent = alertMessage;
+      loginAlert.style.display = 'flex';
+    } else {
+      loginAlert.style.display = 'none';
+    }
+  }
+
+  // Pre-fill email with last known email or Super Admin default
+  const emailInput = document.getElementById('login-email');
+  if (emailInput && !emailInput.value) {
+    emailInput.value = 'kirubel.misrak@ethiopost.et';
+  }
+  const passwordInput = document.getElementById('login-password');
+  if (passwordInput) {
+    passwordInput.value = '';
+    passwordInput.focus();
+  }
+};
+
+window.hideLoginGate = function() {
+  const loginGate = document.getElementById('login-gate');
+  const appRoot = document.getElementById('app-root');
+  if (loginGate) loginGate.style.display = 'none';
+  if (appRoot) appRoot.style.display = 'flex';
+};
+
+window.togglePasswordVisibility = function(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    input.type = 'password';
+    btn.textContent = 'Show';
+  }
+};
+
+window.handleLoginFormSubmit = async function(e) {
+  e.preventDefault();
+  const email = (document.getElementById('login-email')?.value || '').trim();
+  const password = document.getElementById('login-password')?.value || '';
+  const submitBtn = document.getElementById('login-submit-btn');
+  const loginAlert = document.getElementById('login-alert');
+
+  if (!email || !password) {
+    if (loginAlert) {
+      loginAlert.textContent = 'Please provide both email address and password.';
+      loginAlert.style.display = 'flex';
+    }
+    return;
+  }
+
+  const originalBtnHtml = submitBtn ? submitBtn.innerHTML : 'Sign In';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>Verifying credentials...</span>';
+  }
+  if (loginAlert) loginAlert.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Authentication failed. Please verify credentials.');
+    }
+
+    // Save session
+    setAuthSession(data.token, data.user);
+    window.hideLoginGate();
+    showToast(`Welcome back, ${data.user.name} (${data.user.role})!`, 'success');
+
+    // Bootstrap workspace
+    bootstrapWorkspace();
+
+  } catch (err) {
+    if (loginAlert) {
+      loginAlert.textContent = err.message;
+      loginAlert.style.display = 'flex';
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalBtnHtml;
+    }
+  }
+};
+
+window.logoutUser = function() {
+  clearAuthSession();
+  window.showLoginGate('You have been signed out successfully.');
+  showToast('Signed out of Ethiopost Command Center.', 'info');
+};
+
+// --------------------------------------------------------------------------
+// APPLICATION BOOTSTRAP
+// --------------------------------------------------------------------------
+
+function bootstrapWorkspace() {
+  updateUserUI();
+
   // Inject Sidebar and Header icons safely
   const iconMap = {
     'icon-overview': icons.overview,
@@ -147,56 +270,10 @@ async function bootstrapApp() {
     if (el) el.innerHTML = svg;
   }
 
-  // User Profile Switcher setup
-  updateUserUI();
-  const userChipBtn = document.getElementById('user-chip-btn');
-  const userDropdown = document.getElementById('user-switch-dropdown');
-
-  if (userChipBtn && userDropdown) {
-    userChipBtn.onclick = (e) => {
-      e.stopPropagation();
-      userDropdown.classList.toggle('active');
-    };
-
-    api('/api/team').then(teamData => {
-      const users = teamData.users || [];
-      userDropdown.innerHTML = `
-        <div class="user-switch-header">Switch Team Member</div>
-        ${users.map(u => `
-          <div class="user-switch-item ${u.name === state.currentUser.name ? 'current' : ''}" data-uid="${u.id}">
-            <div class="user-avatar" style="width: 24px; height: 24px; font-size: 10px;">${u.avatar}</div>
-            <div style="display: flex; flex-direction: column; overflow: hidden;">
-              <span style="font-size: 11.5px; font-weight: 600;">${u.name}</span>
-              <span style="font-size: 10px; color: var(--ep-muted);">${u.role}</span>
-            </div>
-          </div>
-        `).join('')}
-      `;
-
-      userDropdown.querySelectorAll('.user-switch-item').forEach(item => {
-        item.onclick = (e) => {
-          e.stopPropagation();
-          const uid = item.dataset.uid;
-          const selected = users.find(x => x.id === uid);
-          if (selected) {
-            setCurrentUser(selected);
-            userDropdown.classList.remove('active');
-            userDropdown.querySelectorAll('.user-switch-item').forEach(i => i.classList.remove('current'));
-            item.classList.add('current');
-          }
-        };
-      });
-    }).catch(() => {});
-
-    document.addEventListener('click', (e) => {
-      if (!userChipBtn.contains(e.target) && !userDropdown.contains(e.target)) {
-        userDropdown.classList.remove('active');
-      }
-    });
+  // Initialize router
+  if (!window.router) {
+    window.router = new Router();
   }
-
-  // Initialize router and trigger immediate route execution
-  window.router = new Router();
   window.router.handleRoute();
 
   // Initialize modal dialogs concurrently in background
@@ -273,11 +350,27 @@ async function bootstrapApp() {
       }
     });
   }
+
+  // Refresh user identity from server
+  api('/api/auth/me').then(data => {
+    if (data.user) {
+      setAuthSession(state.authToken, data.user);
+    }
+  }).catch(() => {});
 }
 
-// Ensure execution regardless of document state
+// Bootstrap Application Entry
+function init() {
+  if (isLoggedIn()) {
+    window.hideLoginGate();
+    bootstrapWorkspace();
+  } else {
+    window.showLoginGate();
+  }
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bootstrapApp);
+  document.addEventListener('DOMContentLoaded', init);
 } else {
-  bootstrapApp();
+  init();
 }

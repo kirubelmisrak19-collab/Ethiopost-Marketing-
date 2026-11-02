@@ -200,7 +200,12 @@ export function initDatabase() {
       role TEXT NOT NULL,
       department TEXT DEFAULT 'Marketing & Communication',
       status TEXT DEFAULT 'Active',
-      avatar TEXT
+      avatar TEXT,
+      password_hash TEXT,
+      salt TEXT,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      last_login TEXT
     );
 
     -- 12. System Settings & Dynamic Thresholds
@@ -221,6 +226,23 @@ export function initDatabase() {
       timestamp TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Safe schema migrations for existing databases
+  const userMigrations = [
+    'ALTER TABLE users ADD COLUMN password_hash TEXT;',
+    'ALTER TABLE users ADD COLUMN salt TEXT;',
+    'ALTER TABLE users ADD COLUMN created_by TEXT;',
+    'ALTER TABLE users ADD COLUMN created_at TEXT;',
+    'ALTER TABLE users ADD COLUMN last_login TEXT;'
+  ];
+
+  for (const m of userMigrations) {
+    try {
+      db.exec(m);
+    } catch (e) {
+      // Column already exists
+    }
+  }
 }
 
 initDatabase();

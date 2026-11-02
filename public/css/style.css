@@ -1532,3 +1532,294 @@ body {
   background: var(--ep-primary-light);
 }
 
+
+
+/* ==========================================================================
+   ENTERPRISE AUTHENTICATION GATE & LOGIN SCREEN
+   ========================================================================== */
+.login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: linear-gradient(135deg, #090E1A 0%, #172033 50%, #0F172A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 440px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 36px 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  animation: loginCardFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes loginCardFadeIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.login-brand-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  background: var(--ep-primary);
+  color: #FFFFFF;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px -4px rgba(40, 56, 127, 0.35);
+  border: 2px solid rgba(239, 166, 31, 0.3);
+}
+
+.login-brand-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--ep-primary);
+  margin-bottom: 2px;
+}
+
+.login-brand-subtitle {
+  font-size: 13px;
+  color: var(--ep-muted);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.login-gate-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+.gate-dot {
+  width: 6px;
+  height: 6px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #10B981;
+}
+
+.login-alert {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  margin-bottom: 18px;
+  line-height: 1.4;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ep-text);
+  margin-bottom: 6px;
+}
+
+.input-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon-wrap .input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--ep-muted);
+  pointer-events: none;
+}
+
+.login-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 40px 0 38px;
+  border: 1px solid var(--ep-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ep-text);
+  background: #FFFFFF;
+  transition: all 0.15s ease;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--ep-primary);
+  box-shadow: 0 0 0 3px rgba(40, 56, 127, 0.12);
+}
+
+.pwd-toggle-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ep-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.pwd-toggle-btn:hover {
+  color: var(--ep-primary);
+  background: var(--ep-surface-secondary);
+}
+
+.login-btn {
+  height: 42px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.login-footer-info {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ep-border);
+  text-align: center;
+}
+
+.login-notice {
+  font-size: 11.5px;
+  color: var(--ep-muted);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.login-credential-hint {
+  background: #F8FAFC;
+  border: 1px dashed var(--ep-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--ep-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hint-label {
+  font-weight: 600;
+  color: var(--ep-primary);
+}
+
+.login-credential-hint code {
+  background: #EEF2FF;
+  color: var(--ep-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+
+/* Sidebar Footer User & Logout */
+.user-chip-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sidebar-footer .user-chip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-logout-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94A3B8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-logout-btn:hover {
+  background: #EF4444;
+  border-color: #EF4444;
+  color: #FFFFFF;
+}
+
+/* Super Admin Governance Banner In Team View */
+.governance-banner {
+  background: linear-gradient(90deg, #EEF2FF 0%, #FAF5FF 100%);
+  border: 1px solid #C7D2FE;
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.governance-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ep-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.governance-desc {
+  font-size: 12px;
+  color: var(--ep-text-secondary);
+}

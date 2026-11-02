@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from './db.js';
 import { seedDatabase } from './seed.js';
+import { hashPassword, verifyPassword, generateToken, verifyToken } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3050;
@@ -113,6 +114,97 @@ export async function requestHandler(req, res) {
   // ------------------------------------------------------------------------
   if (pathname.startsWith('/api/')) {
     try {
+      // --- Public Authentication Endpoint ---
+      if (pathname === '/api/auth/login' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        const email = (body.email || '').trim().toLowerCase();
+        const password = body.password || '';
+
+        if (!email || !password) {
+          return sendJson(res, 400, { error: 'Please enter both work email and password.' });
+        }
+
+        const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(email);
+        if (!user || !user.password_hash) {
+          return sendJson(res, 401, { error: 'Invalid email or password.' });
+        }
+
+        if (user.status !== 'Active') {
+          return sendJson(res, 403, { error: 'This account has been deactivated. Please contact Super Administrator Kirubel Misrak.' });
+        }
+
+        if (!verifyPassword(password, user.password_hash, user.salt)) {
+          return sendJson(res, 401, { error: 'Invalid email or password.' });
+        }
+
+        db.prepare(`UPDATE users SET last_login = datetime('now') WHERE id = ?`).run(user.id);
+        const token = generateToken(user);
+
+        return sendJson(res, 200, {
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            department: user.department,
+            status: user.status,
+            avatar: user.avatar
+          }
+        });
+      }
+
+      // --- Security Gate: Verify Authentication Token for Protected APIs ---
+      let authToken = null;
+      const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        authToken = authHeader.slice(7).trim();
+      } else if (query.token) {
+        authToken = query.token;
+      }
+
+      const decodedUser = verifyToken(authToken);
+      if (!decodedUser) {
+        return sendJson(res, 401, {
+          error: 'Access denied: Please sign in to access Ethiopost Marketing Command Center',
+          code: 'UNAUTHORIZED'
+        });
+      }
+      req.user = decodedUser;
+
+      // --- Current Authenticated User Session ---
+      if (pathname === '/api/auth/me' && method === 'GET') {
+        const freshUser = db.prepare(`
+          SELECT id, name, email, role, department, status, avatar, created_at, last_login
+          FROM users WHERE id = ?
+        `).get(req.user.id);
+        if (!freshUser) {
+          return sendJson(res, 404, { error: 'User record not found.' });
+        }
+        return sendJson(res, 200, { user: freshUser });
+      }
+
+      // --- Change Own Password ---
+      if (pathname === '/api/auth/change-password' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        if (!body.currentPassword || !body.newPassword) {
+          return sendJson(res, 400, { error: 'Current password and new password are required.' });
+        }
+        if (body.newPassword.length < 6) {
+          return sendJson(res, 400, { error: 'New password must be at least 6 characters long.' });
+        }
+
+        const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+        if (!userRow || !verifyPassword(body.currentPassword, userRow.password_hash, userRow.salt)) {
+          return sendJson(res, 400, { error: 'Current password does not match.' });
+        }
+
+        const { hash, salt } = hashPassword(body.newPassword);
+        db.prepare('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?').run(hash, salt, req.user.id);
+
+        return sendJson(res, 200, { message: 'Password updated successfully.' });
+      }
+
       const todayStr = query.date || '2026-10-28';
       const currentMonth = query.month || '2026-10';
 
@@ -639,33 +731,142 @@ export async function requestHandler(req, res) {
       }
 
       // --- Team & Approvals API (with Separation of Duties) ---
-      if (pathname === '/api/team' && method === 'GET' || pathname === '/api/approvals' && method === 'GET') {
-        const users = db.prepare(`SELECT * FROM users ORDER BY id ASC`).all();
+      if ((pathname === '/api/team' || pathname === '/api/users') && method === 'GET' || pathname === '/api/approvals' && method === 'GET') {
+        const users = db.prepare(`
+          SELECT id, name, email, role, department, status, avatar, created_by, created_at, last_login
+          FROM users ORDER BY created_at DESC, id ASC
+        `).all();
         const approvals = db.prepare(`SELECT * FROM approval_requests ORDER BY created_at DESC`).all();
         return sendJson(res, 200, { users, approvals });
       }
 
-      if (pathname === '/api/team' && method === 'POST') {
+      // --- Super Admin Account Provisioning ---
+      if ((pathname === '/api/team' || pathname === '/api/users') && method === 'POST') {
+        if (req.user.role !== 'Super Administrator') {
+          return sendJson(res, 403, {
+            error: 'Permission denied: Only Super Administrator Kirubel Misrak can provision new team accounts.'
+          });
+        }
+
         const body = await parseJsonBody(req);
         if (!body.name || !body.role) {
-          return sendJson(res, 400, { error: 'Name and role are required' });
+          return sendJson(res, 400, { error: 'Full name and departmental role are required.' });
         }
+
+        const email = (body.email || `${body.name.toLowerCase().replace(/\s+/g, '.')}@ethiopost.et`).trim().toLowerCase();
+        
+        // Ensure email uniqueness
+        const existing = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(email);
+        if (existing) {
+          return sendJson(res, 400, { error: `An account with email address "${email}" already exists.` });
+        }
+
         const id = `USR-${Date.now().toString().slice(-4)}`;
-        const avatar = body.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const avatar = body.name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'EP';
+        const rawPassword = body.password && body.password.trim().length >= 6 ? body.password.trim() : 'Ethiopost@2026';
+        const { hash, salt } = hashPassword(rawPassword);
+
         db.prepare(`
-          INSERT INTO users (id, name, email, role, department, status, avatar)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO users (id, name, email, role, department, status, avatar, password_hash, salt, created_by, created_at)
+          VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, datetime('now'))
         `).run(
           id,
-          body.name,
-          body.email || `${body.name.toLowerCase().replace(/\s+/g, '.')}@ethiopost.et`,
-          body.role,
-          body.department || 'Marketing Operations',
-          'Active',
-          avatar
+          body.name.trim(),
+          email,
+          body.role.trim(),
+          body.department ? body.department.trim() : 'Marketing Operations',
+          avatar,
+          hash,
+          salt,
+          req.user.name
         );
-        const newUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-        return sendJson(res, 201, newUser);
+
+        const newUser = db.prepare(`
+          SELECT id, name, email, role, department, status, avatar, created_by, created_at, last_login
+          FROM users WHERE id = ?
+        `).get(id);
+
+        return sendJson(res, 201, {
+          message: `Team account created for ${newUser.name}`,
+          user: newUser,
+          temporaryPassword: rawPassword
+        });
+      }
+
+      // --- Super Admin: Update User Account (Role, Status, Department) ---
+      const userUpdateMatch = pathname.match(/^\/api\/users\/([^\/]+)$/);
+      if (userUpdateMatch && method === 'PUT') {
+        if (req.user.role !== 'Super Administrator') {
+          return sendJson(res, 403, { error: 'Only Super Administrator can modify user accounts.' });
+        }
+
+        const targetId = userUpdateMatch[1];
+        const body = await parseJsonBody(req);
+        const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(targetId);
+        if (!targetUser) {
+          return sendJson(res, 404, { error: 'User account not found.' });
+        }
+
+        // Prevent Super Admin from deactivating own account
+        if (targetId === req.user.id && body.status && body.status !== 'Active') {
+          return sendJson(res, 400, { error: 'You cannot deactivate your own Super Administrator account.' });
+        }
+
+        db.prepare(`
+          UPDATE users SET
+            role = COALESCE(?, role),
+            department = COALESCE(?, department),
+            status = COALESCE(?, status)
+          WHERE id = ?
+        `).run(body.role || null, body.department || null, body.status || null, targetId);
+
+        const updated = db.prepare(`
+          SELECT id, name, email, role, department, status, avatar, created_by, created_at, last_login
+          FROM users WHERE id = ?
+        `).get(targetId);
+
+        return sendJson(res, 200, { message: `Account updated for ${updated.name}`, user: updated });
+      }
+
+      // --- Super Admin: Reset User Password ---
+      const userResetMatch = pathname.match(/^\/api\/users\/([^\/]+)\/reset-password$/);
+      if (userResetMatch && method === 'POST') {
+        if (req.user.role !== 'Super Administrator') {
+          return sendJson(res, 403, { error: 'Only Super Administrator can reset user passwords.' });
+        }
+
+        const targetId = userResetMatch[1];
+        const body = await parseJsonBody(req);
+        const newPassword = body.newPassword || 'Ethiopost@2026';
+
+        if (newPassword.length < 6) {
+          return sendJson(res, 400, { error: 'Password must be at least 6 characters long.' });
+        }
+
+        const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(targetId);
+        if (!targetUser) {
+          return sendJson(res, 404, { error: 'User account not found.' });
+        }
+
+        const { hash, salt } = hashPassword(newPassword);
+        db.prepare('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?').run(hash, salt, targetId);
+
+        return sendJson(res, 200, { message: `Password reset successfully for ${targetUser.name}.` });
+      }
+
+      // --- Super Admin: Delete User Account ---
+      if (userUpdateMatch && method === 'DELETE') {
+        if (req.user.role !== 'Super Administrator') {
+          return sendJson(res, 403, { error: 'Only Super Administrator can delete accounts.' });
+        }
+
+        const targetId = userUpdateMatch[1];
+        if (targetId === req.user.id) {
+          return sendJson(res, 400, { error: 'You cannot delete your own Super Administrator account.' });
+        }
+
+        db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+        return sendJson(res, 200, { message: 'User account deleted successfully.' });
       }
 
       const approvalDecideMatch = pathname.match(/^\/api\/approvals\/([^\/]+)\/decide$/);
@@ -765,7 +966,7 @@ export async function requestHandler(req, res) {
 
 const server = http.createServer(requestHandler);
 
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && process.argv[1] && process.argv[1].endsWith('server.js')) {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Ethiopost Marketing Command Center running at http://0.0.0.0:${PORT}/`);
   });

@@ -5,6 +5,7 @@
  */
 
 import { db, initDatabase } from './db.js';
+import { hashPassword } from './auth.js';
 
 export function seedDatabase() {
   initDatabase();
@@ -60,23 +61,39 @@ export function seedDatabase() {
     }
   }
 
-  // 3. Super Administrator User
-  const existingUsers = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
-  if (existingUsers === 0) {
-    const insertUser = db.prepare(`
-      INSERT INTO users (id, name, email, role, department, status, avatar)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+  // 3. Super Administrator User (Kirubel Misrak)
+  const defaultAdminEmail = 'kirubel.misrak@ethiopost.et';
+  const adminUser = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(defaultAdminEmail);
+  const defaultPassword = 'Ethiopost@2026';
+  const { hash, salt } = hashPassword(defaultPassword);
 
-    insertUser.run(
+  if (!adminUser) {
+    db.prepare(`
+      INSERT INTO users (id, name, email, role, department, status, avatar, password_hash, salt, created_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
       'USR-ADMIN',
       'Kirubel Misrak',
-      'kirubel.misrak@ethiopost.et',
+      defaultAdminEmail,
       'Super Administrator',
       'Marketing & Digital Communications',
       'Active',
-      'KM'
+      'KM',
+      hash,
+      salt,
+      'SYSTEM'
     );
+    console.log(`Seeded Super Administrator Kirubel Misrak with password: ${defaultPassword}`);
+  } else if (!adminUser.password_hash) {
+    db.prepare(`
+      UPDATE users SET
+        password_hash = ?,
+        salt = ?,
+        role = 'Super Administrator',
+        status = 'Active'
+      WHERE id = ?
+    `).run(hash, salt, adminUser.id);
+    console.log(`Updated credentials for Super Administrator Kirubel Misrak.`);
   }
 
   // 4. System Settings

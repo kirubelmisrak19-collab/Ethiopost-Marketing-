@@ -10,6 +10,65 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- Enterprise Authentication Login Gate -->
+  <div id="login-gate" class="login-gate" style="display: none;">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-brand-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+            <circle cx="18" cy="18" r="3"></circle>
+            <polyline points="18,17 18,18 19,19"></polyline>
+          </svg>
+        </div>
+        <div class="login-brand-title">ETHIOPOST</div>
+        <div class="login-brand-subtitle">Marketing Command Center</div>
+        <div class="login-gate-badge">
+          <span class="gate-dot"></span> Authorized Access Only
+        </div>
+      </div>
+
+      <div id="login-alert" class="login-alert" style="display: none;"></div>
+
+      <form id="login-form" class="login-form" onsubmit="window.handleLoginFormSubmit(event)">
+        <div class="login-field">
+          <label class="login-label" for="login-email">Official Work Email</label>
+          <div class="input-icon-wrap">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <input type="email" id="login-email" class="login-input" placeholder="kirubel.misrak@ethiopost.et" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="login-field">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label class="login-label" for="login-password" style="margin-bottom: 0;">Password</label>
+          </div>
+          <div class="input-icon-wrap">
+            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <input type="password" id="login-password" class="login-input" placeholder="Enter your password" required autocomplete="current-password">
+            <button type="button" class="pwd-toggle-btn" onclick="window.togglePasswordVisibility('login-password', this)">Show</button>
+          </div>
+        </div>
+
+        <button type="submit" id="login-submit-btn" class="btn btn-primary login-btn">
+          <span>Sign In to Command Center</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </button>
+      </form>
+
+      <div class="login-footer-info">
+        <p class="login-notice">
+          Access is restricted to verified Ethiopost staff. New accounts are provisioned exclusively by Super Administrator <strong>Kirubel Misrak</strong>.
+        </p>
+        <div class="login-credential-hint">
+          <span class="hint-label">Super Admin:</span>
+          <code>kirubel.misrak@ethiopost.et</code> • <code>Ethiopost@2026</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="app-root">
     <!-- Clean Minimalist Sidebar -->
     <aside id="sidebar">
@@ -70,16 +129,21 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-chip" id="user-chip-btn" title="Click to switch team role">
-          <div class="user-avatar" id="sidebar-user-avatar">KM</div>
-          <div class="user-info">
-            <div class="user-name" id="sidebar-user-name">Kirubel Misrak</div>
-            <div class="user-role" id="sidebar-user-role">Super Administrator</div>
+        <div class="user-chip-wrap">
+          <div class="user-chip" id="user-chip-btn" title="Logged in user profile">
+            <div class="user-avatar" id="sidebar-user-avatar">KM</div>
+            <div class="user-info">
+              <div class="user-name" id="sidebar-user-name">Kirubel Misrak</div>
+              <div class="user-role" id="sidebar-user-role">Super Administrator</div>
+            </div>
           </div>
-          <span style="margin-left: auto; font-size: 10px; color: var(--ep-muted); padding-right: 4px;">▼</span>
-        </div>
-        <div id="user-switch-dropdown" class="user-switch-dropdown">
-          <!-- Injected dynamically with all 10 roles -->
+          <button class="sidebar-logout-btn" id="sidebar-logout-btn" title="Sign Out / Logout" onclick="window.logoutUser()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

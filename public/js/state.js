@@ -1,71 +1,106 @@
 /**
  * Ethiopost Marketing Command Center
- * Client State & Utility Layer
+ * Client State, Authentication & Utility Layer
  */
 
-export const SUPER_ADMIN_USER = {
-  id: 'USR-ADMIN',
-  name: 'Kirubel Misrak',
-  role: 'Super Administrator',
-  email: 'kirubel.misrak@ethiopost.et',
-  department: 'Marketing & Digital Communications'
-};
+const TOKEN_KEY = 'ethiopost_auth_token';
+const USER_KEY = 'ethiopost_auth_user';
 
-const savedUser = typeof localStorage !== 'undefined' ? localStorage.getItem('ethiopost_user') : null;
-let parsedUser = null;
-try {
-  if (savedUser) {
-    parsedUser = JSON.parse(savedUser);
-    if (!parsedUser || parsedUser.name !== 'Kirubel Misrak') {
-      parsedUser = SUPER_ADMIN_USER;
-      localStorage.setItem('ethiopost_user', JSON.stringify(SUPER_ADMIN_USER));
-    }
+export function getAuthToken() {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser() {
+  if (typeof localStorage === 'undefined') return null;
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
   }
-} catch (e) {}
+}
+
+export function setAuthSession(token, user) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+  state.authToken = token;
+  state.currentUser = user;
+  updateUserUI();
+}
+
+export function clearAuthSession() {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+  state.authToken = null;
+  state.currentUser = null;
+}
+
+export function isLoggedIn() {
+  return Boolean(getAuthToken() && getStoredUser());
+}
 
 export const state = {
   currentRoute: 'overview',
   activeMonth: '2026-10',
-  currentUser: parsedUser || SUPER_ADMIN_USER
+  authToken: getAuthToken(),
+  currentUser: getStoredUser()
 };
 
 export function setCurrentUser(user) {
   state.currentUser = user;
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('ethiopost_user', JSON.stringify(user));
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
   updateUserUI();
-  showToast(`Active team role switched to ${user.name}`, 'success');
-  // Re-render current route to reflect user's context
-  if (typeof window !== 'undefined' && window.router) {
-    window.router.handleRoute();
-  }
 }
 
 export function updateUserUI() {
+  if (!state.currentUser) return;
   const nameEl = document.getElementById('sidebar-user-name');
   const roleEl = document.getElementById('sidebar-user-role');
   const avatarEl = document.getElementById('sidebar-user-avatar');
   if (nameEl) nameEl.textContent = state.currentUser.name;
   if (roleEl) roleEl.textContent = state.currentUser.role;
   if (avatarEl) {
-    const initials = state.currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2);
-    avatarEl.textContent = initials;
+    avatarEl.textContent = state.currentUser.avatar || state.currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2);
   }
 }
 
 export async function api(endpoint, options = {}) {
   try {
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const config = {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      ...options
+      ...options,
+      headers
     };
 
     const res = await fetch(endpoint, config);
+
+    // Handle 401 Unauthorized / Token Expiry
+    if (res.status === 401 && endpoint !== '/api/auth/login') {
+      clearAuthSession();
+      if (typeof window !== 'undefined' && typeof window.showLoginGate === 'function') {
+        window.showLoginGate('Session expired or access unauthorized. Please sign in again.');
+      }
+      throw new Error('Access denied: Please sign in to continue.');
+    }
+
     if (!res.ok) {
       let errorMsg = `Server error (${res.status})`;
       try {
@@ -85,7 +120,9 @@ export async function api(endpoint, options = {}) {
     }
     return await res.text();
   } catch (err) {
-    showToast(err.message, 'error');
+    if (endpoint !== '/api/auth/login') {
+      showToast(err.message, 'error');
+    }
     throw err;
   }
 }
