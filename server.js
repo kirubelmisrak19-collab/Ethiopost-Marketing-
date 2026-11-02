@@ -93,18 +93,19 @@ export async function requestHandler(req, res) {
   const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   let pathname = reqUrl.pathname;
   const method = req.method;
-  const query = Object.fromEntries(reqUrl.searchParams.entries());
+  const searchParams = Object.fromEntries(reqUrl.searchParams.entries());
+  const vQuery = (typeof req.query === 'object' && req.query) ? req.query : {};
+  const query = { ...searchParams, ...vQuery };
 
-  // Resilient route resolution (local Node, Vercel catch-all, x-matched-path, query slug)
-  if (req.headers['x-matched-path'] && req.headers['x-matched-path'].startsWith('/api/')) {
-    pathname = req.headers['x-matched-path'];
+  // Resilient route resolution (local Node, Vercel catch-all, x-matched-path, query route)
+  const vMatched = req.headers['x-matched-path'] || req.headers['x-vercel-matched-path'];
+  if (vMatched && vMatched.startsWith('/api/')) {
+    pathname = vMatched.split('?')[0];
   } else if (query.__route) {
-    pathname = `/api/${query.__route}`;
-  } else if (pathname === '/api/[...slug].js' || pathname === '/api/index.js' || pathname === '/api') {
-    if (query.slug) {
-      const slugPath = Array.isArray(query.slug) ? query.slug.join('/') : query.slug;
-      pathname = `/api/${slugPath}`;
-    }
+    pathname = `/api/${query.__route}`.split('?')[0];
+  } else if (query.slug) {
+    const slugStr = Array.isArray(query.slug) ? query.slug.join('/') : query.slug;
+    pathname = `/api/${slugStr}`.split('?')[0];
   }
 
   // ------------------------------------------------------------------------
