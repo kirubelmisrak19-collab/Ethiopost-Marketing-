@@ -166,6 +166,59 @@ async function runTestSuite() {
     });
     assert(updatePlcRes.statusCode === 200, 'PUT /api/advertisements/:id updated placement flight status');
 
+    // 5b. Real-World Lump-Sum Flight Agreement (EBS 1M ETB) & Proof Verification
+    console.log('\n--- 5b. Real-World Lump-Sum Flight Agreement (EBS 1M ETB) & Proof Verification ---');
+    // User scenario: "We agree with EBS for 1 month ad placement and the total money or budget for that will be 1 million ETB"
+    const ebsFlightRes = await makeRequest('POST', '/api/advertisements', authHeader, {
+      campaign_id: testCampId,
+      ad_name: 'Virtual P.O. Box Nationwide 1-Month Prime Flight',
+      outlet_ids: ['OUT-EBS'],
+      placement_type: 'Monthly Broadcast Flight',
+      start_date: '2026-11-01',
+      end_date: '2026-11-30',
+      total_spots: 30,
+      total_cost: 1000000, // Direct 1 Million ETB contract package value!
+      contract_ref: 'ETH-EBS-2026-001'
+    });
+    assert(ebsFlightRes.statusCode === 201, 'Booked 1-Month EBS flight with lump sum 1,000,000 ETB');
+    assert(ebsFlightRes.json.placements[0].total_cost === 1000000, 'Placement records direct 1,000,000 ETB contract value');
+    const ebsPlacementId = ebsFlightRes.json.placements[0].id;
+
+    // Optional Budget Placement (0 ETB)
+    const zeroBudgetFlightRes = await makeRequest('POST', '/api/advertisements', authHeader, {
+      campaign_id: testCampId,
+      ad_name: 'Bartered Public Service Announcement',
+      outlet_ids: ['OUT-EBC'],
+      placement_type: 'PSA Airing',
+      start_date: '2026-11-01',
+      end_date: '2026-11-30',
+      total_spots: 10
+      // total_cost and unit_cost omitted -> 0 ETB optional budget
+    });
+    assert(zeroBudgetFlightRes.statusCode === 201, 'Booked placement with completely optional budget (0 ETB)');
+    assert(zeroBudgetFlightRes.json.placements[0].total_cost === 0, 'Zero budget placement saved cleanly');
+    const zeroPlacementId = zeroBudgetFlightRes.json.placements[0].id;
+
+    // 5c. Ad Delivery Proof of Performance Verification
+    console.log('\n--- 5c. Ad Delivery Proof of Performance Verification ---');
+    const verifyProofRes = await makeRequest('POST', `/api/advertisements/${ebsPlacementId}/verify`, authHeader, {
+      status: 'Verified',
+      delivered_spots: 30,
+      notes: 'Official EBS broadcast transmission certificate #TR-2026-092 verified by Kirubel Misrak',
+      verified_by: 'Kirubel Misrak'
+    });
+    assert(verifyProofRes.statusCode === 200, 'POST /api/advertisements/:id/verify succeeded with 200 OK');
+    assert(verifyProofRes.json.verification_status === 'Verified', 'Verification status returned as Verified');
+
+    // Confirm database state
+    const verifiedRow = db.prepare('SELECT * FROM media_placements WHERE id = ?').get(ebsPlacementId);
+    assert(verifiedRow.verification_status === 'Verified', 'DB media_placements record shows verification_status = Verified');
+    assert(verifiedRow.verified_by === 'Kirubel Misrak', 'DB media_placements record shows verified_by = Kirubel Misrak');
+    assert(verifiedRow.total_cost === 1000000, 'DB media_placements preserved 1,000,000 ETB total_cost');
+
+    const spotRow = db.prepare('SELECT * FROM ad_spots WHERE placement_id = ?').get(ebsPlacementId);
+    assert(spotRow && spotRow.campaign_id === testCampId, 'Ad spot entry logged with genuine campaign_id without FK error');
+
     // 6. Campaign Activities & Milestone Tasks
     console.log('\n--- 6. Campaign Activities & Milestone Tasks ---');
     const newActRes = await makeRequest('POST', '/api/activities', authHeader, {
@@ -200,6 +253,8 @@ async function runTestSuite() {
     for (const p of multiPlacementRes.json.placements) {
       await makeRequest('DELETE', `/api/advertisements/${p.id}`, authHeader);
     }
+    await makeRequest('DELETE', `/api/advertisements/${ebsPlacementId}`, authHeader);
+    await makeRequest('DELETE', `/api/advertisements/${zeroPlacementId}`, authHeader);
     // Delete test outlet
     await makeRequest('DELETE', `/api/media-outlets/${createdOutletId}`, authHeader);
     // Delete test campaign

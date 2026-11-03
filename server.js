@@ -684,9 +684,16 @@ export async function requestHandler(req, res) {
           return sendJson(res, 400, { error: 'Please select at least one media outlet station.' });
         }
 
-        const spotsPerOutlet = Number(body.total_spots) || 1;
-        const unitCost = Number(body.unit_cost) || 0;
-        const costPerPlacement = unitCost * spotsPerOutlet;
+        // Lump-sum contract amount or unit-cost calculation (Budget is 100% optional)
+        let costPerPlacement = 0;
+        if (body.total_cost !== undefined && body.total_cost !== null && body.total_cost !== '') {
+          costPerPlacement = Number(body.total_cost) || 0;
+        } else if (body.unit_cost !== undefined && body.total_spots) {
+          costPerPlacement = (Number(body.unit_cost) || 0) * (Number(body.total_spots) || 1);
+        }
+
+        const spotsPerOutlet = Number(body.total_spots) || 0;
+        const unitCost = spotsPerOutlet > 0 && costPerPlacement > 0 ? Math.round(costPerPlacement / spotsPerOutlet) : (Number(body.unit_cost) || 0);
 
         const createdPlacements = [];
         const insertStmt = db.prepare(`
@@ -714,7 +721,7 @@ export async function requestHandler(req, res) {
             body.campaign_id,
             outletId,
             body.ad_name,
-            body.placement_type || 'Broadcast Flight',
+            body.placement_type || 'Monthly Broadcast Flight',
             contractRef,
             body.start_date,
             body.end_date,
@@ -734,9 +741,11 @@ export async function requestHandler(req, res) {
           });
         }
 
-        // Update campaign spent/budget tracking
+        // Update campaign spent/budget tracking (if cost allocated)
         const totalBatchCost = costPerPlacement * targetOutlets.length;
-        db.prepare('UPDATE campaigns SET spent = spent + ? WHERE id = ?').run(totalBatchCost, body.campaign_id);
+        if (totalBatchCost > 0) {
+          db.prepare('UPDATE campaigns SET spent = spent + ? WHERE id = ?').run(totalBatchCost, body.campaign_id);
+        }
 
         return sendJson(res, 201, {
           message: `Successfully booked ${createdPlacements.length} media placement flight${createdPlacements.length > 1 ? 's' : ''}`,
@@ -789,30 +798,52 @@ export async function requestHandler(req, res) {
         return sendJson(res, 200, { message: 'Placement flight removed successfully' });
       }
 
-      // Ad Spot Delivery Verification Proof Logging
+      // Ad Spot Delivery Verification Proof Logging (Bulletproof with real campaign_id)
       const adVerifyMatch = pathname.match(/^\/api\/advertisements\/([^\/]+)\/verify$/);
       if (adVerifyMatch && method === 'POST') {
         const placementId = adVerifyMatch[1];
         const body = await parseJsonBody(req);
 
+        // Fetch actual placement to obtain real campaign_id and current total_spots
+        const placement = db.prepare('SELECT * FROM media_placements WHERE id = ?').get(placementId);
+        if (!placement) {
+          return sendJson(res, 404, { error: 'Media placement not found.' });
+        }
+
+        const verificationStatus = body.status || 'Verified';
+        const deliveredSpots = body.delivered_spots !== undefined && body.delivered_spots !== ''
+          ? Number(body.delivered_spots)
+          : (placement.delivered_spots || placement.total_spots || 1);
+        const verifiedBy = body.verified_by || (req.user ? req.user.name : 'Kirubel Misrak');
+        const proofNotes = body.notes || 'Proof of performance verified and certified';
+
         db.prepare(`
           UPDATE media_placements SET
-            verification_status = 'Verified',
+            verification_status = ?,
+            delivered_spots = ?,
             proof_notes = ?,
             verified_at = datetime('now'),
             verified_by = ?
           WHERE id = ?
-        `).run(body.notes || 'Proof of performance verified', body.verified_by || 'Dawit Tadesse', placementId);
+        `).run(verificationStatus, deliveredSpots, proofNotes, verifiedBy, placementId);
 
-        // Record a verified ad spot entry
-        db.prepare(`
-          INSERT INTO ad_spots (
-            placement_id, campaign_id, spot_date, program_or_slot,
-            verification_status, verified_by, verified_at, evidence_notes
-          ) VALUES (?, ?, date('now'), 'Verified Run', 'Verified as aired/displayed', ?, datetime('now'), ?)
-        `).run(placementId, body.campaign_id || 'CMP-2026-VPB-01', body.verified_by || 'Dawit Tadesse', body.notes || 'Verification proof logged');
+        // Safely record verified spot entry using placement's actual campaign_id
+        try {
+          db.prepare(`
+            INSERT INTO ad_spots (
+              placement_id, campaign_id, spot_date, program_or_slot,
+              verification_status, verified_by, verified_at, evidence_notes
+            ) VALUES (?, ?, date('now'), 'Verified Run', 'Verified as aired/displayed', ?, datetime('now'), ?)
+          `).run(placementId, placement.campaign_id, verifiedBy, proofNotes);
+        } catch (spotErr) {
+          console.warn('Non-fatal spot recording note:', spotErr.message);
+        }
 
-        return sendJson(res, 200, { message: 'Delivery verified successfully' });
+        return sendJson(res, 200, {
+          message: `Delivery ${verificationStatus.toLowerCase()} successfully`,
+          verification_status: verificationStatus,
+          verified_by: verifiedBy
+        });
       }
 
       // --- Activities API ---

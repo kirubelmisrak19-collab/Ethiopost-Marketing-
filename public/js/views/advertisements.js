@@ -312,8 +312,8 @@ export async function renderAdvertisements(container) {
                         ${p.schedule_time_description ? `<div style="font-size: 10.5px; color: var(--ep-muted); margin-top: 2px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.schedule_time_description}">${p.schedule_time_description}</div>` : ''}
                       </td>
                       <td class="tabular-num" style="font-weight: 700; color: var(--ep-text); font-size: 13px;">
-                        ${formatETB(p.total_cost)}
-                        ${p.unit_cost ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">@ ${formatETB(p.unit_cost)}/spot</div>` : ''}
+                        ${p.total_cost > 0 ? formatETB(p.total_cost) : '<span class="pill pill-draft" style="font-size: 10.5px;">Contract Flight</span>'}
+                        ${p.total_cost > 0 ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">${p.total_spots > 0 && p.unit_cost > 0 ? `@ ${formatETB(p.unit_cost)}/spot` : 'Package Flight'}</div>` : ''}
                       </td>
                       <td>
                         <span class="pill pill-${p.status ? p.status.toLowerCase() : 'active'}">
@@ -412,8 +412,8 @@ export async function renderAdvertisements(container) {
 
                 <div class="ad-card-footer" onclick="event.stopPropagation();">
                   <div class="ad-card-cost">
-                    <span class="ad-cost-label">Committed Spend</span>
-                    <span class="ad-cost-val">${formatETB(p.total_cost)}</span>
+                    <span class="ad-cost-label">Contract Package Value</span>
+                    <span class="ad-cost-val" style="color: ${p.total_cost > 0 ? 'var(--ep-primary)' : 'var(--ep-muted)'}; font-size: ${p.total_cost > 0 ? '14px' : '12px'};">${p.total_cost > 0 ? formatETB(p.total_cost) : 'Contract Flight'}</span>
                   </div>
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <button class="btn btn-secondary btn-sm" onclick="window.inspectPlacement('${p.id}')">
@@ -652,7 +652,7 @@ window.inspectPlacement = function(placementId) {
         </div>
         <div class="spec-item">
           <span class="spec-label">Total Contract Value</span>
-          <span class="spec-val" style="color: var(--ep-primary); font-size: 14px;">${formatETB(p.total_cost || 0)}</span>
+          <span class="spec-val" style="color: var(--ep-primary); font-size: 14px; font-weight: 700;">${p.total_cost > 0 ? formatETB(p.total_cost) : 'Contract Agreement (Optional)'}</span>
         </div>
         <div class="spec-item">
           <span class="spec-label">Partner / Vendor</span>
@@ -749,12 +749,11 @@ window.deletePlacementFlight = async function(placementId, adName) {
 };
 
 window.openOutletsDirectoryModal = async function() {
-  const modalContainer = document.getElementById('modal-container');
+  const modalContainer = document.getElementById('dynamic-modal-slot') || document.getElementById('modal-container');
   if (!modalContainer) return;
 
   modalContainer.innerHTML = `
-    <div class="modal active" id="outlets-directory-modal">
-      <div class="modal-backdrop" onclick="window.closeModal('outlets-directory-modal')"></div>
+    <div class="modal-backdrop active" id="outlets-directory-modal">
       <div class="modal-dialog" style="max-width: 720px; max-height: 85vh;">
         <div class="modal-header">
           <div>

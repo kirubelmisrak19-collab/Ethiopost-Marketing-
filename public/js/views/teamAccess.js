@@ -195,12 +195,11 @@ export async function renderTeamAccess(container) {
 // --------------------------------------------------------------------------
 
 window.openProvisionUserModal = function() {
-  const modalContainer = document.getElementById('modal-container');
+  const modalContainer = document.getElementById('dynamic-modal-slot') || document.getElementById('modal-container');
   if (!modalContainer) return;
 
   modalContainer.innerHTML = `
-    <div class="modal active" id="provision-user-modal">
-      <div class="modal-backdrop" onclick="window.closeModal('provision-user-modal')"></div>
+    <div class="modal-backdrop active" id="provision-user-modal">
       <div class="modal-dialog" style="max-width: 500px;">
         <div class="modal-header">
           <div>
@@ -330,7 +329,7 @@ window.handleCreateUserSubmit = async function(e) {
 };
 
 window.showCredentialHandOffModal = function(name, email, role, password) {
-  const modalContainer = document.getElementById('modal-container');
+  const modalContainer = document.getElementById('dynamic-modal-slot') || document.getElementById('modal-container');
   if (!modalContainer) return;
 
   const credentialsText = `Ethiopost Marketing Command Center
@@ -343,8 +342,7 @@ Password: ${password}
 Please sign in and keep your credentials secure.`;
 
   modalContainer.innerHTML = `
-    <div class="modal active" id="credential-modal">
-      <div class="modal-backdrop" onclick="window.closeModal('credential-modal')"></div>
+    <div class="modal-backdrop active" id="credential-modal">
       <div class="modal-dialog" style="max-width: 480px;">
         <div class="modal-header">
           <div>
@@ -383,12 +381,11 @@ Please sign in and keep your credentials secure.`;
 };
 
 window.openResetPasswordModal = function(userId, userName) {
-  const modalContainer = document.getElementById('modal-container');
+  const modalContainer = document.getElementById('dynamic-modal-slot') || document.getElementById('modal-container');
   if (!modalContainer) return;
 
   modalContainer.innerHTML = `
-    <div class="modal active" id="reset-pwd-modal">
-      <div class="modal-backdrop" onclick="window.closeModal('reset-pwd-modal')"></div>
+    <div class="modal-backdrop active" id="reset-pwd-modal">
       <div class="modal-dialog" style="max-width: 440px;">
         <div class="modal-header">
           <div>

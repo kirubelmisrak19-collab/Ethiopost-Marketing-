@@ -174,11 +174,13 @@ export async function renderCampaigns(container, campaignId = null) {
                     </div>
                   </td>
                   <td>
-                    <div class="tabular-num" style="font-weight: 700; color: var(--ep-text);">${formatCompactETB(c.budget)}</div>
-                    <div class="tabular-num" style="font-size: 11px; color: var(--ep-muted);">Spent: ${formatCompactETB(c.spent)}</div>
-                    <div class="micro-progress-wrap">
-                      <div class="micro-progress-fill ${c.spent > c.budget ? 'gold' : ''}" style="width: ${c.budget > 0 ? Math.min(100, Math.round((c.spent / c.budget) * 100)) : 0}%;"></div>
-                    </div>
+                    <div class="tabular-num" style="font-weight: 700; color: var(--ep-text);">${c.budget > 0 ? formatCompactETB(c.budget) : (c.spent > 0 ? 'Flexible Budget' : '<span style="color: var(--ep-muted); font-size: 11.5px;">Optional</span>')}</div>
+                    <div class="tabular-num" style="font-size: 11px; color: ${c.spent > 0 ? 'var(--ep-primary)' : 'var(--ep-muted)'}; font-weight: 600;">Spent: ${formatCompactETB(c.spent)}</div>
+                    ${c.budget > 0 ? `
+                      <div class="micro-progress-wrap">
+                        <div class="micro-progress-fill ${c.spent > c.budget ? 'gold' : ''}" style="width: ${Math.min(100, Math.round((c.spent / c.budget) * 100))}%;"></div>
+                      </div>
+                    ` : ''}
                   </td>
                   <td style="min-width: 100px;">
                     <div class="tabular-num" style="font-size: 11.5px; font-weight: 600; margin-bottom: 2px; color: var(--ep-text-secondary);">
@@ -523,8 +525,8 @@ function renderWorkspaceTab(campaign, tabs, tabKey) {
                         ${ad.schedule_time_description ? `<div style="font-size: 10.5px; color: var(--ep-muted); margin-top: 2px;">${ad.schedule_time_description}</div>` : ''}
                       </td>
                       <td class="tabular-num" style="font-weight: 700; color: var(--ep-text); font-size: 13px;">
-                        ${formatETB(ad.total_cost)}
-                        ${ad.unit_cost ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">@ ${formatETB(ad.unit_cost)}/spot</div>` : ''}
+                        ${ad.total_cost > 0 ? formatETB(ad.total_cost) : '<span class="pill pill-draft" style="font-size: 10.5px;">Contract Flight</span>'}
+                        ${ad.total_cost > 0 ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">${ad.total_spots > 0 && ad.unit_cost > 0 ? `@ ${formatETB(ad.unit_cost)}/spot` : 'Package Flight'}</div>` : ''}
                       </td>
                       <td>
                         <span class="pill pill-${(ad.status || 'scheduled').toLowerCase()}">

@@ -91,8 +91,8 @@ export async function initModals() {
 
             <div class="form-grid-2">
               <div class="form-group">
-                <label class="form-label">Planned Budget (ETB) *</label>
-                <input type="number" id="cmp-budget" class="form-input" placeholder="e.g. 1500000" min="0" required>
+                <label class="form-label">Planned Budget (ETB) <span style="font-weight: normal; color: var(--ep-muted);">(Optional)</span></label>
+                <input type="number" id="cmp-budget" class="form-input" placeholder="e.g. 1000000 (Optional - leave blank if not set)" min="0">
               </div>
               <div class="form-group">
                 <label class="form-label">Execution Priority</label>
@@ -200,24 +200,38 @@ export async function initModals() {
               </div>
             </div>
 
+            <!-- Lump-Sum Contract Package Value (100% Optional - Real-World Broadcast Model) -->
+            <div style="background: #F8FAFC; border: 1px solid var(--ep-border); border-radius: var(--radius-sm); padding: 12px 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0; font-weight: 700; color: var(--ep-primary);">
+                  Total Contract Package Value (ETB) <span style="font-weight: normal; color: var(--ep-muted); font-size: 11.5px;">(Optional)</span>
+                </label>
+                <span class="pill pill-gold" style="font-size: 10px;">Lump-Sum Flight Agreement</span>
+              </div>
+              <input type="number" id="plc-total-cost" class="form-input" placeholder="e.g. 1000000 (e.g. 1-Month Placement on EBS - Optional)" min="0" oninput="window.calculatePlacementTotalCost()">
+              <div style="font-size: 11.5px; color: var(--ep-muted); margin-top: 5px;">
+                Enter the direct lump-sum contract amount (e.g. <strong>1,000,000 ETB</strong>). Leave blank if budget is optional or untracked.
+              </div>
+            </div>
+
             <div class="form-grid-2">
               <div class="form-group">
-                <label class="form-label">Spots / Runs Per Station *</label>
-                <input type="number" id="plc-spots" class="form-input" value="30" min="1" required oninput="window.calculatePlacementTotalCost()">
+                <label class="form-label">Estimated Spots / Airings <span style="font-weight: normal; color: var(--ep-muted);">(Optional)</span></label>
+                <input type="number" id="plc-spots" class="form-input" placeholder="e.g. 30 (Optional)" min="0" oninput="window.calculatePlacementTotalCost()">
               </div>
               <div class="form-group">
-                <label class="form-label">Unit Cost Per Spot (ETB) *</label>
-                <input type="number" id="plc-unit-cost" class="form-input" value="7500" min="0" required oninput="window.calculatePlacementTotalCost()">
+                <label class="form-label">Unit Spot Cost (ETB) <span style="font-weight: normal; color: var(--ep-muted);">(Optional)</span></label>
+                <input type="number" id="plc-unit-cost" class="form-input" placeholder="e.g. 7500 (Optional)" min="0" oninput="window.calculatePlacementTotalCost()">
               </div>
             </div>
 
             <!-- Real-time Investment Calculation Banner -->
             <div id="plc-cost-banner" style="background: linear-gradient(90deg, #EEF2FF 0%, #FAF5FF 100%); border: 1px solid #C7D2FE; border-radius: var(--radius-sm); padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <div style="font-size: 11px; font-weight: 700; color: var(--ep-muted); text-transform: uppercase;">Estimated Total Investment</div>
-                <div id="plc-calc-details" style="font-size: 11.5px; color: var(--ep-text-secondary);">0 stations × 30 spots @ ETB 7,500</div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--ep-muted); text-transform: uppercase;">Flight Contract Summary</div>
+                <div id="plc-calc-details" style="font-size: 11.5px; color: var(--ep-text-secondary);">Select media station(s) above • Budget is completely optional</div>
               </div>
-              <div id="plc-calc-total" style="font-size: 16px; font-weight: 800; color: var(--ep-primary);">ETB 0</div>
+              <div id="plc-calc-total" style="font-size: 15px; font-weight: 800; color: var(--ep-primary);">ETB 0 (Optional)</div>
             </div>
           </div>
 
@@ -427,27 +441,47 @@ export async function initModals() {
 
     <!-- 6. Verify Ad Delivery Modal -->
     <div id="verify-modal" class="modal-backdrop">
-      <div class="modal-dialog">
+      <div class="modal-dialog" style="max-width: 540px;">
         <div class="modal-header">
-          <div class="modal-title">Verify Ad Delivery & Proof</div>
+          <div>
+            <div class="modal-title">Verify Ad Delivery & Proof of Performance</div>
+            <div class="modal-subtitle">Official broadcast compliance certificate & transmission log audit</div>
+          </div>
           <button class="modal-close" onclick="closeModal('verify-modal')">${icons.close}</button>
         </div>
         <form id="verify-form">
           <input type="hidden" id="vf-placement-id">
-          <div class="modal-body">
-            <div id="verify-ad-meta" style="margin-bottom: 14px; font-weight: 600; font-size: 13.5px; color: var(--ep-primary);"></div>
-            <div class="form-group">
-              <label class="form-label">Verification Source & Evidence</label>
-              <textarea id="vf-notes" class="form-textarea" placeholder="Confirm station broadcast transmission certificate, photo proof of billboard, or analytics screenshot verified..." required></textarea>
+          <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+            <div id="verify-ad-meta" style="background: #F8FAFC; border: 1px solid var(--ep-border); border-radius: var(--radius-sm); padding: 12px 14px;"></div>
+            
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label class="form-label">Verification Decision *</label>
+                <select id="vf-status" class="form-select" required>
+                  <option value="Verified" selected>✓ Verified as Delivered (Airtime / Proof Confirmed)</option>
+                  <option value="Under Review">⏳ Under Review (Pending Broadcast Certificate)</option>
+                  <option value="Flagged">⚠️ Flagged / Disputed (Under-delivered or Mismatched)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Delivered Spots / Runs</label>
+                <input type="number" id="vf-delivered-spots" class="form-input" placeholder="e.g. 30 (Optional)" min="0">
+              </div>
             </div>
+
             <div class="form-group">
-              <label class="form-label">Verified By</label>
+              <label class="form-label">Proof of Performance / Certificate Reference *</label>
+              <textarea id="vf-notes" class="form-textarea" placeholder="e.g. EBS Broadcast Transmission Log #TR-9921, Airtime Certificate, or As-Run Log verified on Nov 3..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Verified By (Super Administrator / Officer) *</label>
               <input type="text" id="vf-user" class="form-input" value="${state.currentUser ? state.currentUser.name : 'Kirubel Misrak'}" required>
             </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeModal('verify-modal')">Cancel</button>
-            <button type="submit" class="btn btn-primary">Confirm Verification</button>
+            <button type="submit" id="vf-submit-btn" class="btn btn-primary">Confirm & Log Verification</button>
           </div>
         </form>
       </div>
@@ -551,19 +585,44 @@ function updateSelectedCount() {
 }
 
 window.calculatePlacementTotalCost = function() {
+  const enteredTotal = document.getElementById('plc-total-cost')?.value;
   const spots = Number(document.getElementById('plc-spots')?.value) || 0;
   const unitCost = Number(document.getElementById('plc-unit-cost')?.value) || 0;
   const count = selectedOutletIds.size;
-  const total = count * spots * unitCost;
 
   const detailsEl = document.getElementById('plc-calc-details');
   const totalEl = document.getElementById('plc-calc-total');
 
-  if (detailsEl) {
-    detailsEl.textContent = `${count} station${count === 1 ? '' : 's'} × ${spots} spots @ ${formatETB(unitCost)}`;
-  }
-  if (totalEl) {
-    totalEl.textContent = formatETB(total);
+  if (enteredTotal !== undefined && enteredTotal !== '' && Number(enteredTotal) > 0) {
+    const pkgAmount = Number(enteredTotal);
+    const total = (count > 1 ? count : 1) * pkgAmount;
+    if (detailsEl) {
+      if (count > 1) {
+        detailsEl.textContent = `${count} stations × ${formatETB(pkgAmount)} contract package`;
+      } else {
+        detailsEl.textContent = `Lump-sum contract package${spots > 0 ? ` (~${spots} airings)` : ''} • Budget is optional`;
+      }
+    }
+    if (totalEl) {
+      totalEl.textContent = formatETB(total);
+    }
+  } else if (spots > 0 && unitCost > 0) {
+    const total = (count > 0 ? count : 1) * spots * unitCost;
+    if (detailsEl) {
+      detailsEl.textContent = `${count > 0 ? count : 1} station(s) × ${spots} spots @ ${formatETB(unitCost)}`;
+    }
+    if (totalEl) {
+      totalEl.textContent = formatETB(total);
+    }
+  } else {
+    if (detailsEl) {
+      detailsEl.textContent = count > 0
+        ? `${count} station${count === 1 ? '' : 's'} selected • Contract Agreement (Budget optional / 0 ETB)`
+        : 'Select station(s) • Budget is completely optional';
+    }
+    if (totalEl) {
+      totalEl.textContent = 'ETB 0 (Optional)';
+    }
   }
 };
 
@@ -755,26 +814,36 @@ function bindFormSubmissions() {
       }
 
       try {
-        const spots = Number(document.getElementById('plc-spots').value) || 1;
-        const unitCost = Number(document.getElementById('plc-unit-cost').value) || 0;
+        const enteredTotal = document.getElementById('plc-total-cost')?.value;
+        const spots = Number(document.getElementById('plc-spots')?.value) || 0;
+        const unitCost = Number(document.getElementById('plc-unit-cost')?.value) || 0;
+
+        let totalCost = 0;
+        if (enteredTotal !== undefined && enteredTotal !== '' && Number(enteredTotal) >= 0) {
+          totalCost = Number(enteredTotal);
+        } else if (spots > 0 && unitCost > 0) {
+          totalCost = spots * unitCost;
+        }
+
         const payload = {
           campaign_id: document.getElementById('plc-campaign').value,
           ad_name: document.getElementById('plc-name').value.trim(),
           outlet_ids: Array.from(selectedOutletIds),
-          placement_type: document.getElementById('plc-type').value.trim() || 'Broadcast Flight',
+          placement_type: document.getElementById('plc-type').value.trim() || 'Monthly Broadcast Flight',
           start_date: document.getElementById('plc-start').value,
           end_date: document.getElementById('plc-end').value,
-          total_spots: spots,
-          unit_cost: unitCost,
+          total_spots: spots > 0 ? spots : 1,
+          total_cost: totalCost,
+          unit_cost: spots > 0 && totalCost > 0 ? Math.round(totalCost / spots) : unitCost,
           contract_ref: document.getElementById('plc-contract').value.trim()
         };
 
         const res = await api('/api/advertisements', { method: 'POST', body: JSON.stringify(payload) });
-        showToast(res.message || 'Media placements booked successfully!', 'success');
+        showToast(res.message || 'Media placement flights booked successfully!', 'success');
         closeModal('placement-modal');
         plcForm.reset();
         selectedOutletIds.clear();
-        window.router.handleRoute();
+        if (window.router) window.router.handleRoute();
       } catch (err) {
         showToast(err.message, 'error');
       } finally {
@@ -791,19 +860,52 @@ function bindFormSubmissions() {
     vfForm.onsubmit = async (e) => {
       e.preventDefault();
       const id = document.getElementById('vf-placement-id').value;
-      const notes = document.getElementById('vf-notes').value.trim();
-      const verified_by = document.getElementById('vf-user').value.trim();
+      const status = document.getElementById('vf-status')?.value || 'Verified';
+      const notes = document.getElementById('vf-notes')?.value.trim();
+      const deliveredSpots = document.getElementById('vf-delivered-spots')?.value;
+      const verified_by = document.getElementById('vf-user')?.value.trim() || (state.currentUser ? state.currentUser.name : 'Kirubel Misrak');
+      const submitBtn = document.getElementById('vf-submit-btn');
+
+      if (!id) {
+        showToast('Error: Placement flight ID is missing.', 'error');
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Certifying Proof...';
+      }
+
       try {
         await api(`/api/advertisements/${id}/verify`, {
           method: 'POST',
-          body: JSON.stringify({ notes, verified_by })
+          body: JSON.stringify({
+            status,
+            notes,
+            delivered_spots: deliveredSpots !== '' && deliveredSpots !== undefined ? Number(deliveredSpots) : undefined,
+            verified_by
+          })
         });
-        showToast('Ad delivery verified and logged', 'success');
+        showToast(`Ad delivery ${status.toLowerCase()} and certified successfully!`, 'success');
         closeModal('verify-modal');
         vfForm.reset();
-        window.router.handleRoute();
+
+        // Refresh drawer inspection if open
+        const drawerBackdrop = document.getElementById('placement-drawer-backdrop');
+        if (drawerBackdrop && drawerBackdrop.classList.contains('active')) {
+          if (typeof window.inspectPlacement === 'function') {
+            window.inspectPlacement(id);
+          }
+        }
+
+        if (window.router) window.router.handleRoute();
       } catch (err) {
         showToast(err.message, 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Confirm & Log Verification';
+        }
       }
     };
   }
@@ -832,15 +934,33 @@ window.openPlacementForCampaign = async function(campaignId) {
 };
 
 window.openVerifyModal = function(id, adName, outletName) {
+  let modal = document.getElementById('verify-modal');
+  if (!modal) {
+    initModals();
+    modal = document.getElementById('verify-modal');
+  }
+
   const input = document.getElementById('vf-placement-id');
   if (input) input.value = id;
+
   const userInput = document.getElementById('vf-user');
   if (userInput && state.currentUser) userInput.value = state.currentUser.name;
+
   const meta = document.getElementById('verify-ad-meta');
   if (meta) {
-    meta.textContent = `${adName} • ${outletName} (${id})`;
+    meta.innerHTML = `
+      <div style="font-size: 13.5px; font-weight: 700; color: var(--ep-text);">${adName || 'Broadcast Placement'}</div>
+      <div style="font-size: 12px; color: var(--ep-muted); margin-top: 3px;">
+        Media Station: <strong style="color: var(--ep-primary);">${outletName || 'Broadcast Partner'}</strong> • Placement ID: <span class="code-tag primary">${id}</span>
+      </div>
+    `;
   }
-  const modal = document.getElementById('verify-modal');
+
+  const notesInput = document.getElementById('vf-notes');
+  if (notesInput && !notesInput.value) {
+    notesInput.value = `Verified broadcast transmission certificate and log for ${outletName || 'station'}.`;
+  }
+
   if (modal) modal.classList.add('active');
 };
 
