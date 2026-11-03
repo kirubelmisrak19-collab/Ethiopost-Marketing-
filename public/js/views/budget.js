@@ -20,13 +20,18 @@ export async function renderBudget(container) {
     const totalSpend = (stageTotals.paid || 0) + (stageTotals.invoiced || 0);
 
     container.innerHTML = `
-      <div style="margin-bottom: 20px;">
-        <h2 style="font-size: 18px; font-weight: 700; color: var(--ep-text); margin-bottom: 2px;">
-          Marketing Budget & Financial Governance
-        </h2>
-        <p style="font-size: 12.5px; color: var(--ep-muted);">
-          Lifecycle expense accounting across Committed, Invoiced, and Paid disbursement stages
-        </p>
+      <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700; color: var(--ep-text); margin-bottom: 2px;">
+            Marketing Budget & Financial Governance
+          </h2>
+          <p style="font-size: 12.5px; color: var(--ep-muted);">
+            Lifecycle expense accounting across Committed, Invoiced, and Paid disbursement stages
+          </p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('expense-modal')">
+          <span>${icons.plus}</span> + Record Expense Voucher
+        </button>
       </div>
 
       <!-- Financial Stage Summary Grid -->

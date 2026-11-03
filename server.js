@@ -401,14 +401,14 @@ export async function requestHandler(req, res) {
           body.start_date,
           body.end_date,
           body.fiscal_year || 'FY2026/27',
-          body.owner || 'Marketing Lead',
+          body.owner || (req.user ? req.user.name : 'Kirubel Misrak'),
           Number(body.budget) || 0,
           JSON.stringify(body.channels || ['Television', 'Radio']),
           Number(body.target_leads) || 0,
           Number(body.target_reach) || 0,
-          body.priority || 'Medium',
-          body.approval_status || 'Draft',
-          body.execution_status || 'Draft',
+          body.priority || 'High',
+          body.approval_status || 'Approved',
+          body.execution_status || 'Active',
           body.notes || ''
         );
 
@@ -491,14 +491,112 @@ export async function requestHandler(req, res) {
         const body = await parseJsonBody(req);
         db.prepare(`
           UPDATE campaigns SET
+            title = COALESCE(?, title),
+            strategic_objective = COALESCE(?, strategic_objective),
+            budget = COALESCE(?, budget),
+            start_date = COALESCE(?, start_date),
+            end_date = COALESCE(?, end_date),
             execution_status = COALESCE(?, execution_status),
             approval_status = COALESCE(?, approval_status),
-            budget = COALESCE(?, budget),
+            priority = COALESCE(?, priority),
             updated_at = datetime('now')
           WHERE id = ?
-        `).run(body.execution_status || null, body.approval_status || null, body.budget || null, campaignId);
+        `).run(
+          body.title || null,
+          body.strategic_objective || null,
+          body.budget !== undefined ? Number(body.budget) : null,
+          body.start_date || null,
+          body.end_date || null,
+          body.execution_status || null,
+          body.approval_status || null,
+          body.priority || null,
+          campaignId
+        );
 
         return sendJson(res, 200, { message: 'Campaign updated successfully' });
+      }
+
+      if (campaignDetailMatch && method === 'DELETE') {
+        const campaignId = campaignDetailMatch[1];
+        db.prepare('DELETE FROM expenses WHERE campaign_id = ?').run(campaignId);
+        db.prepare('DELETE FROM ad_spots WHERE campaign_id = ?').run(campaignId);
+        db.prepare('DELETE FROM media_placements WHERE campaign_id = ?').run(campaignId);
+        db.prepare('DELETE FROM campaign_activities WHERE campaign_id = ?').run(campaignId);
+        db.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignId);
+        return sendJson(res, 200, { message: 'Campaign deleted successfully' });
+      }
+
+      // --- Media Outlets API (Directory, Dynamic Add, Update, Remove) ---
+      if (pathname === '/api/media-outlets' && method === 'GET') {
+        const outlets = db.prepare(`SELECT * FROM media_outlets ORDER BY type ASC, name ASC`).all();
+        return sendJson(res, 200, outlets);
+      }
+
+      if (pathname === '/api/media-outlets' && method === 'POST') {
+        const body = await parseJsonBody(req);
+        if (!body.name || !body.type) {
+          return sendJson(res, 400, { error: 'Outlet name and media category type are required.' });
+        }
+        const slug = body.name.toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 16);
+        const randId = `OUT-${slug}-${Date.now().toString().slice(-4)}`;
+
+        db.prepare(`
+          INSERT INTO media_outlets (id, name, type, coverage, vendor_name, contact_person, contact_phone, rate_summary, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+        `).run(
+          randId,
+          body.name.trim(),
+          body.type.trim(),
+          body.coverage || 'National',
+          body.vendor_name ? body.vendor_name.trim() : body.name.trim(),
+          body.contact_person || '',
+          body.contact_phone || '',
+          body.rate_summary || ''
+        );
+
+        const newOutlet = db.prepare('SELECT * FROM media_outlets WHERE id = ?').get(randId);
+        return sendJson(res, 201, newOutlet);
+      }
+
+      const outletDetailMatch = pathname.match(/^\/api\/media-outlets\/([^\/]+)$/);
+      if (outletDetailMatch && method === 'PUT') {
+        const outletId = outletDetailMatch[1];
+        const body = await parseJsonBody(req);
+        db.prepare(`
+          UPDATE media_outlets SET
+            name = COALESCE(?, name),
+            type = COALESCE(?, type),
+            coverage = COALESCE(?, coverage),
+            vendor_name = COALESCE(?, vendor_name),
+            contact_person = COALESCE(?, contact_person),
+            contact_phone = COALESCE(?, contact_phone),
+            rate_summary = COALESCE(?, rate_summary),
+            status = COALESCE(?, status)
+          WHERE id = ?
+        `).run(
+          body.name || null,
+          body.type || null,
+          body.coverage || null,
+          body.vendor_name || null,
+          body.contact_person || null,
+          body.contact_phone || null,
+          body.rate_summary || null,
+          body.status || null,
+          outletId
+        );
+        const updated = db.prepare('SELECT * FROM media_outlets WHERE id = ?').get(outletId);
+        return sendJson(res, 200, updated);
+      }
+
+      if (outletDetailMatch && method === 'DELETE') {
+        const outletId = outletDetailMatch[1];
+        const inUse = db.prepare('SELECT COUNT(*) as c FROM media_placements WHERE outlet_id = ?').get(outletId).c;
+        if (inUse > 0) {
+          db.prepare("UPDATE media_outlets SET status = 'inactive' WHERE id = ?").run(outletId);
+          return sendJson(res, 200, { message: 'Outlet has historical placements; marked as inactive.' });
+        }
+        db.prepare('DELETE FROM media_outlets WHERE id = ?').run(outletId);
+        return sendJson(res, 200, { message: 'Media outlet removed successfully.' });
       }
 
       // --- Advertisements Inventory API ---
@@ -570,14 +668,28 @@ export async function requestHandler(req, res) {
 
       if (pathname === '/api/advertisements' && method === 'POST') {
         const body = await parseJsonBody(req);
-        if (!body.campaign_id || !body.outlet_id || !body.ad_name || !body.start_date || !body.end_date) {
-          return sendJson(res, 400, { error: 'Missing required ad placement fields' });
+        if (!body.campaign_id || !body.ad_name || !body.start_date || !body.end_date) {
+          return sendJson(res, 400, { error: 'Missing required ad placement fields (campaign, title, dates)' });
         }
 
-        const randId = `PLC-2026-${String(Math.floor(Math.random() * 900) + 100)}`;
-        const totalCost = Number(body.total_cost) || (Number(body.unit_cost || 0) * Number(body.total_spots || 1));
+        // Support both array outlet_ids (multi-select batch) and single outlet_id
+        let targetOutlets = [];
+        if (Array.isArray(body.outlet_ids) && body.outlet_ids.length > 0) {
+          targetOutlets = body.outlet_ids;
+        } else if (body.outlet_id) {
+          targetOutlets = [body.outlet_id];
+        }
 
-        db.prepare(`
+        if (targetOutlets.length === 0) {
+          return sendJson(res, 400, { error: 'Please select at least one media outlet station.' });
+        }
+
+        const spotsPerOutlet = Number(body.total_spots) || 1;
+        const unitCost = Number(body.unit_cost) || 0;
+        const costPerPlacement = unitCost * spotsPerOutlet;
+
+        const createdPlacements = [];
+        const insertStmt = db.prepare(`
           INSERT INTO media_placements (
             id, campaign_id, outlet_id, ad_name, placement_type, contract_ref,
             start_date, end_date, schedule_time_description, total_spots, delivered_spots,
@@ -586,24 +698,95 @@ export async function requestHandler(req, res) {
           ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'Approved', 'Unpaid', ?, 'Active', 'Pending'
           )
-        `).run(
-          randId,
-          body.campaign_id,
-          body.outlet_id,
-          body.ad_name,
-          body.placement_type || 'Standard',
-          body.contract_ref || randId,
-          body.start_date,
-          body.end_date,
-          body.schedule_time_description || '',
-          Number(body.total_spots) || 1,
-          Number(body.unit_cost) || 0,
-          totalCost,
-          body.vendor || 'Media Vendor',
-          body.responsible_officer || 'Marketing Lead'
-        );
+        `);
 
-        return sendJson(res, 201, { id: randId, message: 'Media placement created successfully' });
+        for (let i = 0; i < targetOutlets.length; i++) {
+          const outletId = targetOutlets[i];
+          const outlet = db.prepare('SELECT name, vendor_name FROM media_outlets WHERE id = ?').get(outletId);
+          const outletName = outlet ? outlet.name : outletId;
+          const randSuffix = String(Math.floor(Math.random() * 900) + 100);
+          const placementId = `PLC-2026-${Date.now().toString().slice(-4)}-${i + 1}${randSuffix.slice(-1)}`;
+          const contractRef = body.contract_ref ? (targetOutlets.length > 1 ? `${body.contract_ref}-${i + 1}` : body.contract_ref) : placementId;
+          const vendor = body.vendor || (outlet ? outlet.vendor_name : 'Media Vendor');
+
+          insertStmt.run(
+            placementId,
+            body.campaign_id,
+            outletId,
+            body.ad_name,
+            body.placement_type || 'Broadcast Flight',
+            contractRef,
+            body.start_date,
+            body.end_date,
+            body.schedule_time_description || '',
+            spotsPerOutlet,
+            unitCost,
+            costPerPlacement,
+            vendor,
+            body.responsible_officer || (req.user ? req.user.name : 'Marketing Lead')
+          );
+
+          createdPlacements.push({
+            id: placementId,
+            outlet_id: outletId,
+            outlet_name: outletName,
+            total_cost: costPerPlacement
+          });
+        }
+
+        // Update campaign spent/budget tracking
+        const totalBatchCost = costPerPlacement * targetOutlets.length;
+        db.prepare('UPDATE campaigns SET spent = spent + ? WHERE id = ?').run(totalBatchCost, body.campaign_id);
+
+        return sendJson(res, 201, {
+          message: `Successfully booked ${createdPlacements.length} media placement flight${createdPlacements.length > 1 ? 's' : ''}`,
+          count: createdPlacements.length,
+          placements: createdPlacements,
+          totalInvestment: totalBatchCost,
+          id: createdPlacements[0]?.id
+        });
+      }
+
+      // Individual Media Placement Update & Deletion
+      const placementActionMatch = pathname.match(/^\/api\/advertisements\/([^\/]+)$/);
+      if (placementActionMatch && method === 'PUT') {
+        const placementId = placementActionMatch[1];
+        const body = await parseJsonBody(req);
+        db.prepare(`
+          UPDATE media_placements SET
+            ad_name = COALESCE(?, ad_name),
+            placement_type = COALESCE(?, placement_type),
+            status = COALESCE(?, status),
+            total_spots = COALESCE(?, total_spots),
+            delivered_spots = COALESCE(?, delivered_spots),
+            unit_cost = COALESCE(?, unit_cost),
+            total_cost = COALESCE(?, total_cost),
+            end_date = COALESCE(?, end_date)
+          WHERE id = ?
+        `).run(
+          body.ad_name || null,
+          body.placement_type || null,
+          body.status || null,
+          body.total_spots !== undefined ? Number(body.total_spots) : null,
+          body.delivered_spots !== undefined ? Number(body.delivered_spots) : null,
+          body.unit_cost !== undefined ? Number(body.unit_cost) : null,
+          body.total_cost !== undefined ? Number(body.total_cost) : null,
+          body.end_date || null,
+          placementId
+        );
+        return sendJson(res, 200, { message: 'Placement updated successfully' });
+      }
+
+      if (placementActionMatch && method === 'DELETE') {
+        const placementId = placementActionMatch[1];
+        const placement = db.prepare('SELECT campaign_id, total_cost FROM media_placements WHERE id = ?').get(placementId);
+        if (placement) {
+          db.prepare('UPDATE campaigns SET spent = MAX(0, spent - ?) WHERE id = ?').run(placement.total_cost || 0, placement.campaign_id);
+          db.prepare('DELETE FROM ad_spots WHERE placement_id = ?').run(placementId);
+          db.prepare('DELETE FROM expenses WHERE placement_id = ?').run(placementId);
+          db.prepare('DELETE FROM media_placements WHERE id = ?').run(placementId);
+        }
+        return sendJson(res, 200, { message: 'Placement flight removed successfully' });
       }
 
       // Ad Spot Delivery Verification Proof Logging
@@ -654,13 +837,42 @@ export async function requestHandler(req, res) {
           body.campaign_id,
           body.title,
           body.activity_type || 'Task',
-          body.owner || 'Marketing Officer',
-          body.start_date || '2026-10-28',
-          body.due_date,
+          body.owner || (req.user ? req.user.name : 'Marketing Officer'),
+          body.start_date || new Date().toISOString().split('T')[0],
+          body.due_date || new Date().toISOString().split('T')[0],
           Number(body.budget) || 0
         );
 
         return sendJson(res, 201, { message: 'Activity created successfully' });
+      }
+
+      const activityDetailMatch = pathname.match(/^\/api\/activities\/([^\/]+)$/);
+      if (activityDetailMatch && method === 'PUT') {
+        const actId = activityDetailMatch[1];
+        const body = await parseJsonBody(req);
+        db.prepare(`
+          UPDATE campaign_activities SET
+            title = COALESCE(?, title),
+            status = COALESCE(?, status),
+            progress = COALESCE(?, progress),
+            owner = COALESCE(?, owner),
+            due_date = COALESCE(?, due_date)
+          WHERE id = ?
+        `).run(
+          body.title || null,
+          body.status || null,
+          body.progress !== undefined ? Number(body.progress) : null,
+          body.owner || null,
+          body.due_date || null,
+          actId
+        );
+        return sendJson(res, 200, { message: 'Activity updated successfully' });
+      }
+
+      if (activityDetailMatch && method === 'DELETE') {
+        const actId = activityDetailMatch[1];
+        db.prepare('DELETE FROM campaign_activities WHERE id = ?').run(actId);
+        return sendJson(res, 200, { message: 'Activity deleted successfully' });
       }
 
       // --- Budget API ---
@@ -671,12 +883,24 @@ export async function requestHandler(req, res) {
           JOIN portfolios p ON b.portfolio_id = p.id
         `).all();
 
+        const expSums = db.prepare(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN stage = 'Approved' THEN amount ELSE 0 END), 0) as approved,
+            COALESCE(SUM(CASE WHEN stage = 'Committed' THEN amount ELSE 0 END), 0) as committed,
+            COALESCE(SUM(CASE WHEN stage = 'Invoiced' THEN amount ELSE 0 END), 0) as invoiced,
+            COALESCE(SUM(CASE WHEN stage = 'Paid' THEN amount ELSE 0 END), 0) as paid
+          FROM expenses
+        `).get();
+
+        const totalCampaignBudgets = db.prepare('SELECT COALESCE(SUM(budget), 0) as total FROM campaigns').get().total;
+        const totalCommittedPlacements = db.prepare('SELECT COALESCE(SUM(total_cost), 0) as total FROM media_placements').get().total;
+
         const stageTotals = {
-          planned: 0,
-          approved: 180000,
-          committed: 420000,
-          invoiced: 710000,
-          paid: 2316000
+          planned: totalCampaignBudgets,
+          approved: Math.max(expSums.approved, totalCampaignBudgets),
+          committed: Math.max(expSums.committed, totalCommittedPlacements),
+          invoiced: expSums.invoiced,
+          paid: expSums.paid
         };
 
         const expenses = db.prepare(`SELECT * FROM expenses ORDER BY created_at DESC`).all();
@@ -697,14 +921,14 @@ export async function requestHandler(req, res) {
         `).run(
           body.campaign_id || null,
           body.placement_id || null,
-          body.title,
+          body.title || 'Marketing Disbursement',
           Number(body.amount) || 0,
           body.category || 'Media Placement',
           body.stage || 'Invoiced',
           body.vendor || '',
           body.invoice_ref || '',
-          body.payment_date || null,
-          body.recorded_by || 'System'
+          body.payment_date || new Date().toISOString().split('T')[0],
+          req.user ? req.user.name : 'Super Administrator'
         );
 
         return sendJson(res, 201, { message: 'Expense recorded successfully' });
@@ -712,8 +936,13 @@ export async function requestHandler(req, res) {
 
       // --- Reports API ---
       if (pathname === '/api/reports/monthly-ops' && method === 'GET') {
+        const activeCampsCount = db.prepare("SELECT COUNT(*) as c FROM campaigns WHERE execution_status = 'Active'").get().c;
+        const livePlacementsCount = db.prepare("SELECT COUNT(*) as c FROM media_placements WHERE status = 'Active'").get().c;
+        const totalBudget = db.prepare("SELECT COALESCE(SUM(budget), 0) as s FROM campaigns").get().s;
+        const actualSpend = db.prepare("SELECT COALESCE(SUM(spent), 0) as s FROM campaigns").get().s;
+
         if (query.export === 'csv') {
-          const csv = 'Report,Month,Total Budget,Actual Spend,Active Campaigns,Live Placements\n"Ethiopost Monthly Operations","2026-10",4733333,3026000,3,9\n';
+          const csv = `Report,Month,Total Budget,Actual Spend,Active Campaigns,Live Placements\n"Ethiopost Monthly Operations","${currentMonth}",${totalBudget},${actualSpend},${activeCampsCount},${livePlacementsCount}\n`;
           res.writeHead(200, {
             'Content-Type': 'text/csv; charset=utf-8',
             'Content-Disposition': 'attachment; filename="ethiopost-monthly-ops.csv"'
@@ -722,11 +951,11 @@ export async function requestHandler(req, res) {
         }
 
         return sendJson(res, 200, {
-          month: '2026-10',
-          totalBudget: 4733333,
-          actualSpend: 3026000,
-          activeCampaigns: 3,
-          livePlacements: 9
+          month: currentMonth,
+          totalBudget: totalBudget,
+          actualSpend: actualSpend,
+          activeCampaigns: activeCampsCount,
+          livePlacements: livePlacementsCount
         });
       }
 

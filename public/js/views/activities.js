@@ -31,6 +31,9 @@ export async function renderActivities(container) {
             Operational deliverables, creative production, and field execution accountability
           </p>
         </div>
+        <button class="btn btn-primary" onclick="openModal('activity-modal')">
+          <span>${icons.plus}</span> + Add Deliverable / Task
+        </button>
       </div>
 
       <!-- Top Summary Metrics Ribbon -->
@@ -69,11 +72,12 @@ export async function renderActivities(container) {
                 <th>Due Date</th>
                 <th>Completion Progress</th>
                 <th>Status</th>
+                <th style="text-align: right;">Action</th>
               </tr>
             </thead>
             <tbody>
               ${activities.length === 0 ? `
-                <tr><td colspan="7" class="empty-state">No activities recorded.</td></tr>
+                <tr><td colspan="8" class="empty-state">No activities recorded. Click "+ Add Deliverable / Task" to create one.</td></tr>
               ` : activities.map(a => `
                 <tr>
                   <td>
@@ -108,6 +112,20 @@ export async function renderActivities(container) {
                       ${a.status}
                     </span>
                   </td>
+                  <td style="text-align: right;">
+                    <div style="display: inline-flex; gap: 6px;">
+                      ${a.status !== 'Completed' ? `
+                        <button class="btn btn-secondary btn-sm" onclick="window.markActivityCompleted(${a.id})" title="Mark task 100% complete">
+                          ✓ Done
+                        </button>
+                      ` : `
+                        <span class="pill pill-active" style="padding: 3px 8px;">✓ Done</span>
+                      `}
+                      <button class="quick-action-btn" style="color: #DC2626;" onclick="window.deleteActivity(${a.id})" title="Delete task">
+                        &times;
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -119,3 +137,23 @@ export async function renderActivities(container) {
     container.innerHTML = `<div class="empty-state" style="color: #DC2626;">Error: ${err.message}</div>`;
   }
 }
+
+window.markActivityCompleted = async function(id) {
+  try {
+    await api(`/api/activities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'Completed', progress: 100 })
+    });
+    if (window.router) window.router.handleRoute();
+  } catch (err) {}
+};
+
+window.deleteActivity = async function(id) {
+  if (!confirm('Are you sure you want to delete this activity task?')) return;
+  try {
+    await api(`/api/activities/${id}`, {
+      method: 'DELETE'
+    });
+    if (window.router) window.router.handleRoute();
+  } catch (err) {}
+};

@@ -107,6 +107,9 @@ export async function renderAdvertisements(container) {
               </button>
             </div>
 
+            <button class="btn btn-secondary btn-sm" onclick="window.openOutletsDirectoryModal()">
+              <span>📺</span> Media Directory
+            </button>
             <a href="/api/advertisements?export=csv" class="btn btn-secondary btn-sm" style="text-decoration: none;" download>
               <span>${icons.download}</span> Export CSV
             </a>
@@ -682,6 +685,22 @@ window.inspectPlacement = function(placementId) {
         ` : ''}
       </div>
     </div>
+    <!-- Flight Lifecycle Management Controls -->
+    <div class="drawer-section">
+      <div class="drawer-section-title">Flight Operational Status</div>
+      <div style="display: flex; gap: 8px; align-items: center; background: #FFFFFF; border: 1px solid var(--ep-border); padding: 10px 14px; border-radius: var(--radius-sm);">
+        <span style="font-size: 12px; color: var(--ep-muted);">Current Status:</span>
+        <select class="form-select" style="height: 32px; font-size: 12px; width: 140px;" onchange="window.updatePlacementStatus('${p.id}', this.value)">
+          <option value="Active" ${p.status === 'Active' ? 'selected' : ''}>Active (Live)</option>
+          <option value="Paused" ${p.status === 'Paused' ? 'selected' : ''}>Paused</option>
+          <option value="Completed" ${p.status === 'Completed' ? 'selected' : ''}>Completed</option>
+          <option value="Scheduled" ${p.status === 'Scheduled' ? 'selected' : ''}>Scheduled</option>
+        </select>
+        <button class="btn btn-sm" style="margin-left: auto; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA;" onclick="window.deletePlacementFlight('${p.id}', '${p.ad_name.replace(/'/g, "\\'")}')">
+          Delete Flight
+        </button>
+      </div>
+    </div>
   `;
 
   if (p.verification_status === 'Verified') {
@@ -695,6 +714,140 @@ window.inspectPlacement = function(placementId) {
   }
 
   backdrop.classList.add('active');
+};
+
+window.updatePlacementStatus = async function(placementId, status) {
+  try {
+    await api(`/api/advertisements/${placementId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
+    });
+    showToast(`Flight status updated to ${status}`, 'success');
+    window.closePlacementDrawer();
+    const container = document.getElementById('view-container');
+    if (container) renderAdvertisements(container);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deletePlacementFlight = async function(placementId, adName) {
+  const confirmMsg = `Are you sure you want to cancel and remove placement flight "${adName}"?\nCampaign budget figures will be automatically adjusted.`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    await api(`/api/advertisements/${placementId}`, {
+      method: 'DELETE'
+    });
+    showToast(`Placement flight "${adName}" removed successfully.`, 'info');
+    window.closePlacementDrawer();
+    const container = document.getElementById('view-container');
+    if (container) renderAdvertisements(container);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.openOutletsDirectoryModal = async function() {
+  const modalContainer = document.getElementById('modal-container');
+  if (!modalContainer) return;
+
+  modalContainer.innerHTML = `
+    <div class="modal active" id="outlets-directory-modal">
+      <div class="modal-backdrop" onclick="window.closeModal('outlets-directory-modal')"></div>
+      <div class="modal-dialog" style="max-width: 720px; max-height: 85vh;">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">Ethiopost Media Outlets & Station Directory</div>
+            <div class="modal-subtitle">Registered television stations, radio networks, billboards, transit and digital publishers</div>
+          </div>
+          <button class="modal-close" onclick="window.closeModal('outlets-directory-modal')">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 18px 24px; max-height: calc(85vh - 140px); overflow-y: auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <input type="text" id="dir-search-input" class="form-input" placeholder="Search station, vendor, or contact..." style="max-width: 280px;" oninput="window.filterDirectoryRows(this.value)">
+            <button class="btn btn-primary btn-sm" onclick="window.closeModal('outlets-directory-modal'); window.openAddOutletModal();">
+              + Add New Media Outlet
+            </button>
+          </div>
+          <div id="directory-table-wrap">
+            <div style="text-align: center; padding: 20px; color: var(--ep-muted);">Loading Media Directory...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="window.closeModal('outlets-directory-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const outlets = await api('/api/media-outlets');
+    window._cachedDirectoryOutlets = outlets;
+    window.renderDirectoryTable(outlets);
+  } catch (err) {
+    document.getElementById('directory-table-wrap').innerHTML = `<div class="empty-state" style="color: #DC2626;">Error loading directory: ${err.message}</div>`;
+  }
+};
+
+window.renderDirectoryTable = function(outlets) {
+  const wrap = document.getElementById('directory-table-wrap');
+  if (!wrap) return;
+
+  if (outlets.length === 0) {
+    wrap.innerHTML = `<div class="empty-state">No media outlets found.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="data-table" style="font-size: 12px;">
+      <thead>
+        <tr>
+          <th>Outlet / Station</th>
+          <th>Type</th>
+          <th>Coverage</th>
+          <th>Contact & Phone</th>
+          <th>Rate Summary</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${outlets.map(o => `
+          <tr>
+            <td>
+              <div style="font-weight: 600; color: var(--ep-text);">${o.name}</div>
+              <div style="font-size: 10.5px; color: var(--ep-muted);">${o.vendor_name || o.name}</div>
+            </td>
+            <td><span class="pill pill-draft" style="font-size: 10px;">${o.type}</span></td>
+            <td>${o.coverage || 'National'}</td>
+            <td>
+              <div>${o.contact_person || 'Commercial Desk'}</div>
+              <div style="font-size: 11px; color: var(--ep-primary); font-family: monospace;">${o.contact_phone || '—'}</div>
+            </td>
+            <td style="font-family: monospace; color: var(--ep-text-secondary);">${o.rate_summary || 'Standard Commercial Rate'}</td>
+            <td>
+              <span class="pill ${o.status === 'active' ? 'pill-active' : 'pill-draft'}" style="font-size: 10px;">
+                ${o.status || 'active'}
+              </span>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+};
+
+window.filterDirectoryRows = function(query) {
+  if (!window._cachedDirectoryOutlets) return;
+  const q = (query || '').toLowerCase().trim();
+  const filtered = window._cachedDirectoryOutlets.filter(o => 
+    o.name.toLowerCase().includes(q) ||
+    o.type.toLowerCase().includes(q) ||
+    (o.vendor_name && o.vendor_name.toLowerCase().includes(q)) ||
+    (o.contact_person && o.contact_person.toLowerCase().includes(q)) ||
+    (o.contact_phone && o.contact_phone.toLowerCase().includes(q))
+  );
+  window.renderDirectoryTable(filtered);
 };
 
 window.closePlacementDrawer = function() {

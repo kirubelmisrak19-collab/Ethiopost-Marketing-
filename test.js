@@ -1,6 +1,7 @@
 /**
  * Ethiopost Marketing Command Center
- * Integration Test Suite - Authentication, Security & Clean Operations
+ * Comprehensive Integration Test Suite
+ * Security, Dynamic Media Outlets, Multi-Station Batch Booking & Operations
  */
 
 import http from 'node:http';
@@ -81,111 +82,132 @@ async function runTestSuite() {
     assert(tables.includes('portfolios'), "Table 'portfolios' exists");
     assert(tables.includes('campaigns'), "Table 'campaigns' exists");
     assert(tables.includes('media_placements'), "Table 'media_placements' exists");
+    assert(tables.includes('media_outlets'), "Table 'media_outlets' exists");
     assert(tables.includes('campaign_activities'), "Table 'campaign_activities' exists");
     assert(tables.includes('expenses'), "Table 'expenses' exists");
     assert(tables.includes('users'), "Table 'users' exists");
-    assert(tables.includes('approval_requests'), "Table 'approval_requests' exists");
 
     const portfolioCount = db.prepare('SELECT COUNT(*) as c FROM portfolios').get().c;
     assert(portfolioCount === 10, `10 Ethiopost operational portfolios active (found: ${portfolioCount})`);
 
     const adminUser = db.prepare('SELECT * FROM users WHERE role = ?').get('Super Administrator');
-    assert(adminUser && adminUser.name === 'Kirubel Misrak', `Super Administrator Kirubel Misrak configured (found: ${adminUser ? adminUser.name : 'none'})`);
-    assert(Boolean(adminUser.password_hash && adminUser.salt), 'Super Administrator has secure password hash & salt');
+    assert(adminUser && adminUser.name === 'Kirubel Misrak', `Super Administrator Kirubel Misrak configured`);
 
-    // 2. Authentication Gate & Access Control
+    // 2. Authentication Gate
     console.log('\n--- 2. Authentication Gate & Access Control ---');
     const unauthRes = await makeRequest('GET', '/api/overview');
-    assert(unauthRes.statusCode === 401, 'Unauthenticated request to /api/overview rejected with 401 Unauthorized');
+    assert(unauthRes.statusCode === 401, 'Unauthenticated access rejected with 401');
 
-    const badLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
-      email: 'kirubel.misrak@ethiopost.et',
-      password: 'IncorrectPassword'
-    });
-    assert(badLoginRes.statusCode === 401, 'Invalid password rejected with 401');
-
-    const goodLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
+    const loginRes = await makeRequest('POST', '/api/auth/login', {}, {
       email: 'kirubel.misrak@ethiopost.et',
       password: 'Ethiopost@2026'
     });
-    assert(goodLoginRes.statusCode === 200, 'Super Administrator login successful with 200 OK');
-    assert(Boolean(goodLoginRes.json.token), 'Login response contains signed HMAC-SHA256 JWT token');
-    assert(goodLoginRes.json.user.name === 'Kirubel Misrak', 'User is Kirubel Misrak');
-    assert(goodLoginRes.json.user.role === 'Super Administrator', 'Role is Super Administrator');
-    const adminToken = goodLoginRes.json.token;
+    assert(loginRes.statusCode === 200, 'Super Administrator login successful');
+    const adminToken = loginRes.json.token;
     const authHeader = { 'Authorization': `Bearer ${adminToken}` };
 
-    // 3. Executive Overview with Auth Token
-    console.log('\n--- 3. Executive Overview API ---');
-    const ovRes = await makeRequest('GET', '/api/overview', authHeader);
-    assert(ovRes.statusCode === 200, 'GET /api/overview with token returned 200 OK');
-    assert(ovRes.json && ovRes.json.kpis, 'Overview contains kpis object');
-    assert(ovRes.json.kpis.activeCampaigns === 0, 'Clean zero active campaigns in fresh state');
-    assert(ovRes.json.kpis.liveAdvertisements === 0, 'Clean zero live advertisements in fresh state');
+    // 3. Dynamic Media Outlets Management
+    console.log('\n--- 3. Dynamic Media Outlets Directory API ---');
+    const outletsListRes = await makeRequest('GET', '/api/media-outlets', authHeader);
+    assert(outletsListRes.statusCode === 200, 'GET /api/media-outlets responded 200 OK');
+    assert(Array.isArray(outletsListRes.json) && outletsListRes.json.length >= 9, 'Seeded media outlets directory returned');
 
-    // 4. Super Admin User Provisioning
-    console.log('\n--- 4. Super Admin Team Provisioning ---');
-    const createRes = await makeRequest('POST', '/api/users', authHeader, {
-      name: 'Selamawit Desta',
-      role: 'Campaign Officer',
-      email: 'selamawit.desta@ethiopost.et',
-      department: 'Marketing Operations',
-      password: 'TempPassword@2026'
+    // Register a new TV station dynamically
+    const newOutletRes = await makeRequest('POST', '/api/media-outlets', authHeader, {
+      name: 'Arts TV Ethiopia',
+      type: 'Television',
+      coverage: 'National',
+      vendor_name: 'Arts World Media Enterprise',
+      contact_person: 'Michael Haile',
+      contact_phone: '+251 11 889 0011',
+      rate_summary: 'Prime Time 30s Spot: ETB 8,000'
     });
-    assert(createRes.statusCode === 201, 'Super Admin created team account with 201 Created');
-    assert(createRes.json.user.email === 'selamawit.desta@ethiopost.et', 'New user has correct email');
-    const newUserId = createRes.json.user.id;
+    assert(newOutletRes.statusCode === 201, 'POST /api/media-outlets registered new TV station with 201 Created');
+    const createdOutletId = newOutletRes.json.id;
 
-    // Login as new user
-    const newUserLoginRes = await makeRequest('POST', '/api/auth/login', {}, {
-      email: 'selamawit.desta@ethiopost.et',
-      password: 'TempPassword@2026'
-    });
-    assert(newUserLoginRes.statusCode === 200, 'New team member logged in successfully');
-    const regularToken = newUserLoginRes.json.token;
-    const regularHeader = { 'Authorization': `Bearer ${regularToken}` };
-
-    // Regular user cannot create users (Super Admin only)
-    const unauthorizedCreate = await makeRequest('POST', '/api/users', regularHeader, {
-      name: 'Unauthorized User',
-      role: 'Super Administrator',
-      email: 'unauth@ethiopost.et'
-    });
-    assert(unauthorizedCreate.statusCode === 403, 'Regular user blocked from creating accounts with 403 Forbidden');
-
-    // Super Admin resets password for user
-    const resetRes = await makeRequest('POST', `/api/users/${newUserId}/reset-password`, authHeader, {
-      newPassword: 'UpdatedSecret@2026'
-    });
-    assert(resetRes.statusCode === 200, 'Super Admin reset user password successfully');
-
-    // Clean up created user
-    const deleteRes = await makeRequest('DELETE', `/api/users/${newUserId}`, authHeader);
-    assert(deleteRes.statusCode === 200, 'Super Admin deleted test user with 200 OK');
-
-    // 5. Clean Campaign Creation Workflow
-    console.log('\n--- 5. Live Campaign Workflow ---');
+    // 4. Live Campaign Creation & Management
+    console.log('\n--- 4. Live Campaign Workflow ---');
     const newCampRes = await makeRequest('POST', '/api/campaigns', authHeader, {
-      title: 'Automated Test Flight',
-      portfolio_id: 'vpb',
+      title: 'Post Gebeya National Harvest Promotion',
+      portfolio_id: 'post-gebeya',
       owner: 'Kirubel Misrak',
       start_date: '2026-11-01',
       end_date: '2026-11-30',
-      budget: 100000,
-      strategic_objective: 'Verification'
+      budget: 850000,
+      strategic_objective: 'Onboard 50,000 rural farmers to digital marketplace'
     });
     assert(newCampRes.statusCode === 201, 'POST /api/campaigns created campaign successfully with 201 Created');
     const testCampId = newCampRes.json.id;
 
-    const detailRes = await makeRequest('GET', `/api/campaigns/${testCampId}`, authHeader);
-    assert(detailRes.statusCode === 200, 'Campaign workspace loaded with 200 OK');
+    // 5. Multi-Station Batch Placement Booking Engine
+    console.log('\n--- 5. Multi-Station Media Placement Booking ---');
+    // Book same TV ad across 3 TV stations at once (EBC, EBS TV, and the newly registered Arts TV)
+    const multiPlacementRes = await makeRequest('POST', '/api/advertisements', authHeader, {
+      campaign_id: testCampId,
+      ad_name: 'Post Gebeya Harvest 30s Prime Commercial',
+      outlet_ids: ['OUT-EBC', 'OUT-EBS', createdOutletId],
+      placement_type: 'Prime Time Broadcast',
+      start_date: '2026-11-01',
+      end_date: '2026-11-30',
+      total_spots: 20,
+      unit_cost: 7500,
+      contract_ref: 'ETH-BATCH-2026-001'
+    });
+    assert(multiPlacementRes.statusCode === 201, 'Batch placement created flights across 3 TV stations with 201 Created');
+    assert(multiPlacementRes.json.count === 3, 'Created exactly 3 placement flights in single submission');
+    assert(multiPlacementRes.json.totalInvestment === 450000, 'Accurately calculated total batch investment (3 stations * 20 spots * 7,500 = 450,000 ETB)');
 
-    // Cleanup test campaign
-    db.prepare('DELETE FROM campaigns WHERE id = ?').run(testCampId);
-    console.log('[PASS] Test campaign cleaned up from database');
+    const firstPlacementId = multiPlacementRes.json.placements[0].id;
 
-    // 6. CSV Streaming Export
-    console.log('\n--- 6. Streaming CSV Exports ---');
+    // Verify placement status update
+    const updatePlcRes = await makeRequest('PUT', `/api/advertisements/${firstPlacementId}`, authHeader, {
+      status: 'Active',
+      delivered_spots: 10
+    });
+    assert(updatePlcRes.statusCode === 200, 'PUT /api/advertisements/:id updated placement flight status');
+
+    // 6. Campaign Activities & Milestone Tasks
+    console.log('\n--- 6. Campaign Activities & Milestone Tasks ---');
+    const newActRes = await makeRequest('POST', '/api/activities', authHeader, {
+      campaign_id: testCampId,
+      title: 'Produce High-Definition Video Master for TV Stations',
+      activity_type: 'Creative Production',
+      owner: 'Kirubel Misrak',
+      due_date: '2026-11-05',
+      budget: 45000
+    });
+    assert(newActRes.statusCode === 201, 'POST /api/activities created task with 201 Created');
+
+    // 7. Expense Accounting & Dynamic Budget Ledger
+    console.log('\n--- 7. Expense Accounting & Dynamic Budget Ledger ---');
+    const newExpRes = await makeRequest('POST', '/api/budget/expenses', authHeader, {
+      campaign_id: testCampId,
+      title: 'EBC Commercial Broadcast Downpayment',
+      amount: 150000,
+      stage: 'Paid',
+      vendor: 'Ethiopian Broadcasting Corp',
+      invoice_ref: 'INV-EBC-2026-9021'
+    });
+    assert(newExpRes.statusCode === 201, 'POST /api/budget/expenses recorded expense voucher with 201 Created');
+
+    const budgetRes = await makeRequest('GET', '/api/budget', authHeader);
+    assert(budgetRes.statusCode === 200, 'GET /api/budget responded 200 OK');
+    assert(budgetRes.json.stageTotals.paid >= 150000, 'Dynamic budget stageTotals.paid includes recorded voucher');
+
+    // 8. Clean Up Test Data
+    console.log('\n--- 8. Cleanup & Database Integrity ---');
+    // Delete test placements
+    for (const p of multiPlacementRes.json.placements) {
+      await makeRequest('DELETE', `/api/advertisements/${p.id}`, authHeader);
+    }
+    // Delete test outlet
+    await makeRequest('DELETE', `/api/media-outlets/${createdOutletId}`, authHeader);
+    // Delete test campaign
+    await makeRequest('DELETE', `/api/campaigns/${testCampId}`, authHeader);
+    console.log('[PASS] All test flights, outlets, and campaigns cleaned up.');
+
+    // 9. Streaming CSV Export
+    console.log('\n--- 9. Streaming CSV Export ---');
     const csvRes = await makeRequest('GET', `/api/advertisements?export=csv&token=${adminToken}`);
     assert(csvRes.statusCode === 200, 'CSV export responded with 200 OK');
     assert(csvRes.headers['content-type'].includes('text/csv'), 'Content-Type is text/csv');

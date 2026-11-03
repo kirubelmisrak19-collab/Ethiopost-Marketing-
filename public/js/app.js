@@ -85,22 +85,22 @@ class Router {
 
     if (hash === '/calendar') {
       if (pageTitle) pageTitle.textContent = 'Flight Operational Calendar';
-      if (primaryLabel) primaryLabel.textContent = '+ New Campaign';
-      if (primaryBtn) primaryBtn.onclick = () => window.openModal('campaign-modal');
+      if (primaryLabel) primaryLabel.textContent = '+ Book Placement';
+      if (primaryBtn) primaryBtn.onclick = () => window.openModal('placement-modal');
       return renderCalendar(this.container);
     }
 
     if (hash === '/activities') {
       if (pageTitle) pageTitle.textContent = 'Campaign Activities & Tasks';
-      if (primaryLabel) primaryLabel.textContent = '+ Add Task';
-      if (primaryBtn) primaryBtn.onclick = () => window.openModal('campaign-modal');
+      if (primaryLabel) primaryLabel.textContent = '+ Add Deliverable';
+      if (primaryBtn) primaryBtn.onclick = () => window.openModal('activity-modal');
       return renderActivities(this.container);
     }
 
     if (hash === '/budget') {
       if (pageTitle) pageTitle.textContent = 'Marketing Budget & Ledger';
       if (primaryLabel) primaryLabel.textContent = '+ Record Expense';
-      if (primaryBtn) primaryBtn.onclick = () => window.openModal('placement-modal');
+      if (primaryBtn) primaryBtn.onclick = () => window.openModal('expense-modal');
       return renderBudget(this.container);
     }
 
@@ -120,8 +120,8 @@ class Router {
 
     if (hash === '/settings') {
       if (pageTitle) pageTitle.textContent = 'System Settings';
-      if (primaryLabel) primaryLabel.textContent = '+ New Campaign';
-      if (primaryBtn) primaryBtn.onclick = () => window.openModal('campaign-modal');
+      if (primaryLabel) primaryLabel.textContent = '+ Add Media Outlet';
+      if (primaryBtn) primaryBtn.onclick = () => window.openAddOutletModal();
       return renderSettings(this.container);
     }
 

@@ -287,7 +287,7 @@ export async function renderCampaignDetail(container, campaignId, activeTab = 'o
             </div>
 
             <!-- Status & Quick Action -->
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
               <select id="update-camp-status" class="form-select" style="height: 32px; font-size: 12px; font-weight: 600;">
                 ${['Draft', 'Submitted', 'Approved', 'Scheduled', 'Active', 'Paused', 'Completed'].map(st => `
                   <option value="${st}" ${campaign.execution_status === st ? 'selected' : ''}>Status: ${st}</option>
@@ -295,6 +295,9 @@ export async function renderCampaignDetail(container, campaignId, activeTab = 'o
               </select>
               <button class="btn btn-primary btn-sm" onclick="openPlacementForCampaign('${campaign.id}')">
                 <span>${icons.plus}</span> Book Media Ad
+              </button>
+              <button class="btn btn-sm" style="background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; height: 32px;" onclick="window.deleteCampaignWorkspace('${campaign.id}', '${campaign.title.replace(/'/g, "\\'")}')" title="Delete campaign">
+                Delete
               </button>
             </div>
           </div>
@@ -653,4 +656,17 @@ window.openPlacementForCampaign = function(campId) {
   const sel = document.getElementById('plc-campaign');
   if (sel) sel.value = campId;
   window.openModal('placement-modal');
+};
+
+window.deleteCampaignWorkspace = async function(campId, title) {
+  const confirmMsg = `Are you sure you want to permanently delete campaign "${title}" (${campId})?\nAll linked media placement flights and tasks will also be removed.`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    await api(`/api/campaigns/${campId}`, { method: 'DELETE' });
+    showToast(`Campaign "${title}" deleted.`, 'info');
+    window.router.navigate('/campaigns');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 };
