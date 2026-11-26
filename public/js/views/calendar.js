@@ -113,6 +113,8 @@ export async function renderCalendar(container) {
                 <tr><td colspan="5" class="empty-state">No media flights scheduled.</td></tr>
               ` : placements.map(p => {
                 const channelClass = getChannelClass(p.media_category);
+                const isEnded = p.isExpired || p.status === 'Completed' || (p.end_date && new Date(p.end_date).getTime() < Date.now());
+                const displayStatus = isEnded ? 'Completed' : (p.status || 'Active');
                 return `
                   <tr>
                     <td>
@@ -129,21 +131,21 @@ export async function renderCalendar(container) {
                       <div style="font-weight: 500; color: var(--ep-text-secondary);">${p.start_date} → ${p.end_date}</div>
                     </td>
                     <td>
-                      ${p.alertLevel === 'expires_today' ? `
+                      ${isEnded ? `
+                        <span class="pill pill-draft" style="color: #4B5563; background: #F3F4F6; font-weight: 500;">✓ Flight Concluded</span>
+                      ` : p.alertLevel === 'expires_today' ? `
                         <span class="pill pill-critical">⚠️ Ends Today</span>
                       ` : p.alertLevel === 'expires_3_days' ? `
                         <span class="pill pill-critical">⏳ ${p.daysRemaining} days left</span>
                       ` : p.alertLevel === 'expires_7_days' ? `
                         <span class="pill pill-warning">🔔 ${p.daysRemaining} days left</span>
-                      ` : p.isExpired ? `
-                        <span class="pill pill-draft">Concluded</span>
                       ` : `
                         <span class="pill pill-active"><span class="dot-pulse-wrap"><span class="dot-pulse"></span>Active flight</span></span>
                       `}
                     </td>
                     <td>
-                      <span class="pill pill-${p.status ? p.status.toLowerCase() : 'active'}">
-                        ${p.status === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : p.status}
+                      <span class="pill pill-${displayStatus.toLowerCase()}">
+                        ${displayStatus === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : displayStatus === 'Completed' ? '✓ Completed' : displayStatus}
                       </span>
                     </td>
                   </tr>

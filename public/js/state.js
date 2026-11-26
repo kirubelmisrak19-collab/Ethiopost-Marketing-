@@ -45,9 +45,13 @@ export function isLoggedIn() {
   return Boolean(getAuthToken() && getStoredUser());
 }
 
+const initialMonth = (typeof window !== 'undefined' && window.location.search.includes('month='))
+  ? new URLSearchParams(window.location.search).get('month')
+  : new Date().toISOString().slice(0, 7);
+
 export const state = {
   currentRoute: 'overview',
-  activeMonth: '2026-10',
+  activeMonth: initialMonth || '2026-11',
   authToken: getAuthToken(),
   currentUser: getStoredUser()
 };

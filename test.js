@@ -267,6 +267,20 @@ async function runTestSuite() {
     assert(csvRes.statusCode === 200, 'CSV export responded with 200 OK');
     assert(csvRes.headers['content-type'].includes('text/csv'), 'Content-Type is text/csv');
 
+    // 10. Automated Calendar Lifecycle Status Sync
+    console.log('\n--- 10. Automated Calendar Lifecycle Status Sync ---');
+    const syncRes = await makeRequest('POST', '/api/sync', authHeader);
+    assert(syncRes.statusCode === 200, 'POST /api/sync responded 200 OK');
+    assert(syncRes.json.date, 'Sync returned current system date');
+
+    const completedAdsRes = await makeRequest('GET', '/api/advertisements?status=Completed', authHeader);
+    assert(completedAdsRes.statusCode === 200, 'GET /api/advertisements?status=Completed responded 200 OK');
+    assert(Array.isArray(completedAdsRes.json), 'Completed placements returned as array');
+    const bikeAd = completedAdsRes.json.find(p => p.id === 'PLC-2026-VPB-BIKE-TOUR');
+    assert(bikeAd !== undefined, 'Concluded Bike Advertisement Tour is classified as Completed');
+    assert(bikeAd.status === 'Completed', 'Bike Advertisement status is strictly Completed');
+    assert(bikeAd.isExpired === true, 'Bike Advertisement isExpired flag evaluates to true');
+
     console.log('\n================================================================');
     console.log('  ALL INTEGRATION VERIFICATION CHECKS PASSED SUCCESSFULLY!       ');
     console.log('================================================================\n');

@@ -20,7 +20,7 @@ let placementsCache = [];
 function getFlightElapsedPercent(startDate, endDate) {
   const start = new Date(startDate).getTime();
   const end = new Date(endDate).getTime();
-  const now = new Date('2026-10-30').getTime();
+  const now = Date.now();
   if (isNaN(start) || isNaN(end) || end <= start) return 0;
   if (now <= start) return 0;
   if (now >= end) return 100;
@@ -215,9 +215,9 @@ export async function renderAdvertisements(container) {
             <!-- Flight Status Filter Chips -->
             <div style="display: flex; align-items: center; gap: 6px;">
               <span style="font-size: 11.5px; font-weight: 600; color: var(--ep-muted); text-transform: uppercase;">Status:</span>
-              ${['all', 'Active', 'Ending Soon', 'Scheduled'].map(st => `
+              ${['all', 'Active', 'Ending Soon', 'Scheduled', 'Completed'].map(st => `
                 <button class="chip-btn ${activeFilter === st ? 'active' : ''}" data-status="${st}" style="padding: 3px 10px; font-size: 11.5px;">
-                  ${st === 'all' ? 'All' : st === 'Ending Soon' ? '⏳ Ending Soon' : st}
+                  ${st === 'all' ? 'All' : st === 'Ending Soon' ? '⏳ Ending Soon' : st === 'Completed' ? '✓ Completed' : st}
                 </button>
               `).join('')}
             </div>
@@ -257,6 +257,8 @@ export async function renderAdvertisements(container) {
                   const channelClass = getChannelClass(p.media_category);
                   const spotPercent = p.total_spots > 0 ? Math.min(100, Math.round(((p.delivered_spots || 0) / p.total_spots) * 100)) : 0;
                   const elapsedPercent = getFlightElapsedPercent(p.start_date, p.end_date);
+                  const isEnded = p.isExpired || p.status === 'Completed' || (p.end_date && new Date(p.end_date).getTime() < Date.now());
+                  const displayStatus = isEnded ? 'Completed' : (p.status || 'Active');
                   return `
                     <tr class="clickable-row" onclick="window.inspectPlacement('${p.id}')">
                       <td>
@@ -288,14 +290,14 @@ export async function renderAdvertisements(container) {
                           <div class="micro-progress-fill ${elapsedPercent >= 100 ? 'green' : ''}" style="width: ${elapsedPercent}%;"></div>
                         </div>
                         <div style="margin-top: 4px;">
-                          ${p.alertLevel === 'expires_today' ? `
+                          ${isEnded ? `
+                            <span class="pill pill-draft" style="color: #4B5563; background: #F3F4F6; font-weight: 500;">✓ Flight Concluded</span>
+                          ` : p.alertLevel === 'expires_today' ? `
                             <span class="pill pill-critical">⚠️ Ends Today</span>
                           ` : p.alertLevel === 'expires_3_days' ? `
                             <span class="pill pill-critical">⏳ ${p.daysRemaining} days left</span>
                           ` : p.alertLevel === 'expires_7_days' ? `
                             <span class="pill pill-warning">🔔 ${p.daysRemaining} days left</span>
-                          ` : p.isExpired ? `
-                            <span class="pill pill-draft">Flight Concluded</span>
                           ` : `
                             <span class="pill pill-active"><span class="dot-pulse-wrap"><span class="dot-pulse"></span>Active flight</span></span>
                           `}
@@ -316,8 +318,8 @@ export async function renderAdvertisements(container) {
                         ${p.total_cost > 0 ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">${p.total_spots > 0 && p.unit_cost > 0 ? `@ ${formatETB(p.unit_cost)}/spot` : 'Package Flight'}</div>` : ''}
                       </td>
                       <td>
-                        <span class="pill pill-${p.status ? p.status.toLowerCase() : 'active'}">
-                          ${p.status === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : p.status}
+                        <span class="pill pill-${displayStatus.toLowerCase()}">
+                          ${displayStatus === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : displayStatus === 'Completed' ? '✓ Completed' : displayStatus}
                         </span>
                       </td>
                       <td style="text-align: right;" onclick="event.stopPropagation();">
@@ -348,6 +350,8 @@ export async function renderAdvertisements(container) {
             const channelClass = getChannelClass(p.media_category);
             const spotPercent = p.total_spots > 0 ? Math.min(100, Math.round(((p.delivered_spots || 0) / p.total_spots) * 100)) : 0;
             const elapsedPercent = getFlightElapsedPercent(p.start_date, p.end_date);
+            const isEnded = p.isExpired || p.status === 'Completed' || (p.end_date && new Date(p.end_date).getTime() < Date.now());
+            const displayStatus = isEnded ? 'Completed' : (p.status || 'Active');
             return `
               <div class="ad-card" onclick="window.inspectPlacement('${p.id}')" style="cursor: pointer;">
                 <div class="ad-card-top">
@@ -356,8 +360,8 @@ export async function renderAdvertisements(container) {
                       <span>${getChannelIcon(p.media_category)}</span>
                       <span>${p.outlet_name}</span>
                     </div>
-                    <span class="pill pill-${p.status ? p.status.toLowerCase() : 'active'}">
-                      ${p.status === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live</span>' : p.status}
+                    <span class="pill pill-${displayStatus.toLowerCase()}">
+                      ${displayStatus === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live</span>' : displayStatus === 'Completed' ? '✓ Completed' : displayStatus}
                     </span>
                   </div>
                   <div class="ad-card-title">${p.ad_name}</div>
@@ -384,14 +388,14 @@ export async function renderAdvertisements(container) {
                       <div class="micro-progress-fill ${elapsedPercent >= 100 ? 'green' : ''}" style="width: ${elapsedPercent}%;"></div>
                     </div>
                     <div style="margin-top: 2px;">
-                      ${p.alertLevel === 'expires_today' ? `
+                      ${isEnded ? `
+                        <span class="pill pill-draft" style="color: #4B5563; background: #F3F4F6; font-weight: 500;">✓ Flight Concluded</span>
+                      ` : p.alertLevel === 'expires_today' ? `
                         <span class="pill pill-critical">⚠️ Ends Today</span>
                       ` : p.alertLevel === 'expires_3_days' ? `
                         <span class="pill pill-critical">⏳ ${p.daysRemaining} days left</span>
                       ` : p.alertLevel === 'expires_7_days' ? `
                         <span class="pill pill-warning">🔔 ${p.daysRemaining} days left</span>
-                      ` : p.isExpired ? `
-                        <span class="pill pill-draft">Flight Concluded</span>
                       ` : `
                         <span class="pill pill-active"><span class="dot-pulse-wrap"><span class="dot-pulse"></span>Active flight</span></span>
                       `}
@@ -542,6 +546,8 @@ window.inspectPlacement = function(placementId) {
   const channelClass = getChannelClass(p.media_category);
   const spotPercent = p.total_spots > 0 ? Math.min(100, Math.round(((p.delivered_spots || 0) / p.total_spots) * 100)) : 0;
   const elapsedPercent = getFlightElapsedPercent(p.start_date, p.end_date);
+  const isEnded = p.isExpired || p.status === 'Completed' || (p.end_date && new Date(p.end_date).getTime() < Date.now());
+  const displayStatus = isEnded ? 'Completed' : (p.status || 'Active');
 
   subtitle.textContent = `${p.id} • ${p.outlet_name}`;
 
@@ -553,8 +559,8 @@ window.inspectPlacement = function(placementId) {
           <span>${getChannelIcon(p.media_category)}</span>
           <span>${p.outlet_name}</span>
         </div>
-        <span class="pill pill-${p.status ? p.status.toLowerCase() : 'active'}">
-          ${p.status === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : p.status}
+        <span class="pill pill-${displayStatus.toLowerCase()}">
+          ${displayStatus === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : displayStatus === 'Completed' ? '✓ Completed' : displayStatus}
         </span>
       </div>
       <div style="font-size: 15px; font-weight: 700; color: var(--ep-text); margin-bottom: 4px;">${p.ad_name}</div>
@@ -604,14 +610,14 @@ window.inspectPlacement = function(placementId) {
           <div class="micro-progress-fill ${elapsedPercent >= 100 ? 'green' : ''}" style="width: ${elapsedPercent}%;"></div>
         </div>
         <div style="margin-top: 6px;">
-          ${p.alertLevel === 'expires_today' ? `
+          ${isEnded ? `
+            <span class="pill pill-draft" style="color: #4B5563; background: #F3F4F6; font-weight: 500;">✓ Flight Concluded</span>
+          ` : p.alertLevel === 'expires_today' ? `
             <span class="pill pill-critical">⚠️ Ends Today</span>
           ` : p.alertLevel === 'expires_3_days' ? `
             <span class="pill pill-critical">⏳ ${p.daysRemaining} days left</span>
           ` : p.alertLevel === 'expires_7_days' ? `
             <span class="pill pill-warning">🔔 ${p.daysRemaining} days left</span>
-          ` : p.isExpired ? `
-            <span class="pill pill-draft">Flight Concluded</span>
           ` : `
             <span class="pill pill-active"><span class="dot-pulse-wrap"><span class="dot-pulse"></span>Active flight</span></span>
           `}

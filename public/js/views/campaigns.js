@@ -14,7 +14,7 @@ let searchQuery = '';
 function getFlightElapsedPercent(startDate, endDate) {
   const start = new Date(startDate).getTime();
   const end = new Date(endDate).getTime();
-  const now = new Date('2026-10-30').getTime();
+  const now = Date.now();
   if (isNaN(start) || isNaN(end) || end <= start) return 0;
   if (now <= start) return 0;
   if (now >= end) return 100;
@@ -425,7 +425,7 @@ function renderWorkspaceTab(campaign, tabs, tabKey) {
           <div class="metric-strip-card">
             <span class="metric-strip-label">Booked Flights</span>
             <span class="metric-strip-val">${ads.length} Placements</span>
-            <span class="metric-strip-sub">${ads.filter(a => a.status === 'Active').length} currently active flights</span>
+            <span class="metric-strip-sub">${ads.filter(a => a.status === 'Active' && (!a.end_date || new Date(a.end_date).getTime() >= Date.now())).length} currently active flights</span>
           </div>
           <div class="metric-strip-card">
             <span class="metric-strip-label">Committed Airtime Spend</span>
@@ -482,6 +482,8 @@ function renderWorkspaceTab(campaign, tabs, tabKey) {
                   const channelClass = getChannelClass(ad.outlet_type || ad.media_category);
                   const spotPercent = ad.total_spots > 0 ? Math.min(100, Math.round(((ad.delivered_spots || 0) / ad.total_spots) * 100)) : 0;
                   const elapsedPercent = getFlightElapsedPercent(ad.start_date, ad.end_date);
+                  const isEnded = ad.isExpired || ad.status === 'Completed' || (ad.end_date && new Date(ad.end_date).getTime() < Date.now());
+                  const displayStatus = isEnded ? 'Completed' : (ad.status || 'Active');
                   return `
                     <tr class="clickable-row" onclick="window.inspectPlacement('${ad.id}')">
                       <td>
@@ -501,14 +503,14 @@ function renderWorkspaceTab(campaign, tabs, tabKey) {
                           <div class="micro-progress-fill ${elapsedPercent >= 100 ? 'green' : ''}" style="width: ${elapsedPercent}%;"></div>
                         </div>
                         <div style="margin-top: 4px;">
-                          ${ad.alertLevel === 'expires_today' ? `
+                          ${isEnded ? `
+                            <span class="pill pill-draft" style="color: #4B5563; background: #F3F4F6; font-weight: 500;">✓ Flight Concluded</span>
+                          ` : ad.alertLevel === 'expires_today' ? `
                             <span class="pill pill-critical">⚠️ Ends Today</span>
                           ` : ad.alertLevel === 'expires_3_days' ? `
                             <span class="pill pill-critical">⏳ ${ad.daysRemaining} days left</span>
                           ` : ad.alertLevel === 'expires_7_days' ? `
                             <span class="pill pill-warning">🔔 ${ad.daysRemaining} days left</span>
-                          ` : ad.isExpired ? `
-                            <span class="pill pill-draft">Flight Concluded</span>
                           ` : `
                             <span class="pill pill-active"><span class="dot-pulse-wrap"><span class="dot-pulse"></span>Active flight</span></span>
                           `}
@@ -529,8 +531,8 @@ function renderWorkspaceTab(campaign, tabs, tabKey) {
                         ${ad.total_cost > 0 ? `<div style="font-size: 10.5px; color: var(--ep-muted); font-weight: normal;">${ad.total_spots > 0 && ad.unit_cost > 0 ? `@ ${formatETB(ad.unit_cost)}/spot` : 'Package Flight'}</div>` : ''}
                       </td>
                       <td>
-                        <span class="pill pill-${(ad.status || 'scheduled').toLowerCase()}">
-                          ${ad.status === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : ad.status}
+                        <span class="pill pill-${displayStatus.toLowerCase()}">
+                          ${displayStatus === 'Active' ? '<span class="dot-pulse-wrap"><span class="dot-pulse"></span>Live Airing</span>' : displayStatus === 'Completed' ? '✓ Completed' : displayStatus}
                         </span>
                       </td>
                       <td style="text-align: right;" onclick="event.stopPropagation();">

@@ -282,7 +282,15 @@ function bootstrapWorkspace() {
   // Month selector listener
   const monthSelect = document.getElementById('global-month-select');
   if (monthSelect) {
-    monthSelect.value = state.activeMonth;
+    if ([...monthSelect.options].some(opt => opt.value === state.activeMonth)) {
+      monthSelect.value = state.activeMonth;
+    } else {
+      const opt = document.createElement('option');
+      opt.value = state.activeMonth;
+      opt.textContent = state.activeMonth;
+      opt.selected = true;
+      monthSelect.appendChild(opt);
+    }
     monthSelect.onchange = (e) => {
       state.activeMonth = e.target.value;
       window.router.handleRoute();

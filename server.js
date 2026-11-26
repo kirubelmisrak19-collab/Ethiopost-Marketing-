@@ -58,23 +58,59 @@ function parseJsonBody(req) {
   });
 }
 
-function calculateExpiry(endDateStr, todayStr = '2026-10-28') {
-  if (!endDateStr) return { daysRemaining: null, alertLevel: 'normal', isExpired: false };
+function calculateExpiry(endDateStr, todayStr = null) {
+  const resolvedToday = todayStr || new Date().toISOString().split('T')[0];
+  if (!endDateStr) return { daysRemaining: null, alertLevel: 'normal', isExpired: false, lifecycleStatus: 'Active' };
   const end = new Date(endDateStr);
-  const today = new Date(todayStr);
+  const today = new Date(resolvedToday);
   const diffTime = end.getTime() - today.getTime();
   const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (daysRemaining < 0) {
-    return { daysRemaining, alertLevel: 'expired', isExpired: true };
+    return { daysRemaining, alertLevel: 'expired', isExpired: true, lifecycleStatus: 'Completed' };
   } else if (daysRemaining === 0) {
-    return { daysRemaining: 0, alertLevel: 'expires_today', isExpired: false };
+    return { daysRemaining: 0, alertLevel: 'expires_today', isExpired: false, lifecycleStatus: 'Active' };
   } else if (daysRemaining <= 3) {
-    return { daysRemaining, alertLevel: 'expires_3_days', isExpired: false };
+    return { daysRemaining, alertLevel: 'expires_3_days', isExpired: false, lifecycleStatus: 'Active' };
   } else if (daysRemaining <= 7) {
-    return { daysRemaining, alertLevel: 'expires_7_days', isExpired: false };
+    return { daysRemaining, alertLevel: 'expires_7_days', isExpired: false, lifecycleStatus: 'Active' };
   }
-  return { daysRemaining, alertLevel: 'normal', isExpired: false };
+  return { daysRemaining, alertLevel: 'normal', isExpired: false, lifecycleStatus: 'Active' };
+}
+
+export function autoSyncOperationalStatuses(todayStr = null) {
+  const resolvedToday = todayStr || new Date().toISOString().split('T')[0];
+  try {
+    // 1. Transition past media placements to 'Completed'
+    db.prepare(`
+      UPDATE media_placements 
+      SET status = 'Completed'
+      WHERE end_date < ? AND status NOT IN ('Completed', 'Cancelled')
+    `).run(resolvedToday);
+
+    // 2. Transition currently running scheduled placements to 'Active'
+    db.prepare(`
+      UPDATE media_placements 
+      SET status = 'Active'
+      WHERE start_date <= ? AND end_date >= ? AND status = 'Scheduled'
+    `).run(resolvedToday, resolvedToday);
+
+    // 3. Transition ended campaigns to 'Completed'
+    db.prepare(`
+      UPDATE campaigns 
+      SET execution_status = 'Completed'
+      WHERE end_date < ? AND execution_status = 'Active'
+    `).run(resolvedToday);
+
+    // 4. Transition scheduled campaigns to 'Active'
+    db.prepare(`
+      UPDATE campaigns 
+      SET execution_status = 'Active'
+      WHERE start_date <= ? AND end_date >= ? AND execution_status = 'Scheduled'
+    `).run(resolvedToday, resolvedToday);
+  } catch (err) {
+    console.error('autoSyncOperationalStatuses error:', err);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -205,8 +241,10 @@ export async function requestHandler(req, res) {
         return sendJson(res, 200, { message: 'Password updated successfully.' });
       }
 
-      const todayStr = query.date || '2026-10-28';
-      const currentMonth = query.month || '2026-10';
+      const realTodayStr = new Date().toISOString().split('T')[0];
+      const todayStr = query.date || realTodayStr;
+      const currentMonth = query.month || todayStr.slice(0, 7);
+      autoSyncOperationalStatuses(todayStr);
 
       // --- Executive Overview ---
       if (pathname === '/api/overview' && method === 'GET') {
@@ -440,10 +478,23 @@ export async function requestHandler(req, res) {
           JOIN media_outlets o ON p.outlet_id = o.id
           WHERE p.campaign_id = ?
           ORDER BY p.start_date ASC
-        `).all(campaignId).map(p => ({
-          ...p,
-          ...calculateExpiry(p.end_date, todayStr)
-        }));
+        `).all(campaignId).map(p => {
+          const expiry = calculateExpiry(p.end_date, todayStr);
+          const isEnded = Boolean(p.end_date && p.end_date < todayStr);
+          const isUpcoming = Boolean(p.start_date && p.start_date > todayStr);
+          let effectiveStatus = p.status;
+          if (isEnded) {
+            effectiveStatus = 'Completed';
+          } else if (p.status === 'Scheduled' && !isUpcoming) {
+            effectiveStatus = 'Active';
+          }
+          return {
+            ...p,
+            status: effectiveStatus,
+            ...expiry,
+            isExpired: isEnded || expiry.isExpired
+          };
+        });
 
         // Fetch Tab 3: Activities
         const activities = db.prepare(`
@@ -627,11 +678,17 @@ export async function requestHandler(req, res) {
 
         if (query.status && query.status !== 'all') {
           if (query.status === 'Ending Soon') {
-            sql += ` AND p.status = 'Active' AND p.end_date >= ? AND p.end_date <= date(?, '+7 days')`;
-            params.push(todayStr, todayStr);
+            sql += ` AND p.status = 'Active' AND p.start_date <= ? AND p.end_date >= ? AND p.end_date <= date(?, '+7 days')`;
+            params.push(todayStr, todayStr, todayStr);
           } else if (query.status === 'Active') {
-            sql += ` AND p.status = 'Active' AND p.start_date <= ? AND p.end_date >= ?`;
+            sql += ` AND (p.status = 'Active' AND p.start_date <= ? AND p.end_date >= ?)`;
             params.push(todayStr, todayStr);
+          } else if (query.status === 'Completed') {
+            sql += ` AND (p.status = 'Completed' OR p.end_date < ?)`;
+            params.push(todayStr);
+          } else if (query.status === 'Scheduled') {
+            sql += ` AND (p.status = 'Scheduled' OR p.start_date > ?)`;
+            params.push(todayStr);
           } else {
             sql += ` AND p.status = ?`;
             params.push(query.status);
@@ -645,10 +702,23 @@ export async function requestHandler(req, res) {
         }
 
         sql += ` ORDER BY p.start_date DESC`;
-        const placements = db.prepare(sql).all(...params).map(p => ({
-          ...p,
-          ...calculateExpiry(p.end_date, todayStr)
-        }));
+        const placements = db.prepare(sql).all(...params).map(p => {
+          const expiry = calculateExpiry(p.end_date, todayStr);
+          const isEnded = Boolean(p.end_date && p.end_date < todayStr);
+          const isUpcoming = Boolean(p.start_date && p.start_date > todayStr);
+          let effectiveStatus = p.status;
+          if (isEnded) {
+            effectiveStatus = 'Completed';
+          } else if (p.status === 'Scheduled' && !isUpcoming) {
+            effectiveStatus = 'Active';
+          }
+          return {
+            ...p,
+            status: effectiveStatus,
+            ...expiry,
+            isExpired: isEnded || expiry.isExpired
+          };
+        });
 
         // CSV Export Support
         if (query.export === 'csv') {
@@ -1178,6 +1248,12 @@ export async function requestHandler(req, res) {
         });
       }
 
+      // --- Calendar Sync Maintenance API ---
+      if (pathname === '/api/sync' && method === 'POST') {
+        autoSyncOperationalStatuses(todayStr);
+        return sendJson(res, 200, { message: 'Calendar dates and flight operational statuses synchronized.', date: todayStr });
+      }
+
       // --- Global Search API ---
       if (pathname === '/api/search' && method === 'GET') {
         const q = `%${query.q || ''}%`;
@@ -1227,6 +1303,8 @@ export async function requestHandler(req, res) {
 const server = http.createServer(requestHandler);
 
 if (!process.env.VERCEL && process.argv[1] && process.argv[1].endsWith('server.js')) {
+  autoSyncOperationalStatuses();
+  setInterval(() => autoSyncOperationalStatuses(), 60 * 60 * 1000);
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Ethiopost Marketing Command Center running at http://0.0.0.0:${PORT}/`);
   });
