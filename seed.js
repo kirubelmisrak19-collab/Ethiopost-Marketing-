@@ -65,7 +65,8 @@ export function seedDatabase() {
     ['OUT-BIKE-TOUR', 'Addis City Bike Advertising & Promo Tour Fleet', 'Transit', 'Addis Ababa Metro', 'City Bike Promo Network', 'Tewodros Girma', '+251 91 188 4400', 'Mobile Street Tour & Brand Caravan', 'active'],
     ['OUT-ANBESSA-BUS', 'Anbessa City Bus Fleet #10', 'Transit', 'Greater Addis Ababa', 'Anbessa Transport Enterprise', 'Getachew Mengistu', '+251 11 442 1100', 'Full Back Wrap: ETB 25,000/bus/mo', 'active'],
     ['OUT-LRT-TRAIN', 'Addis Ababa Light Rail Transit', 'Transit', 'East-West & North-South Lines', 'ERC Transit Advertising', 'Solomon Tadesse', '+251 11 654 3210', 'Train Exterior Full Wrap: ETB 85,000/train', 'active'],
-    ['OUT-SOCIAL-TG', 'Ethiopost Telegram & Social Media', 'Social', 'National & Diaspora', 'Digital Growth Partners', 'Kirubel Misrak', '+251 91 100 2233', 'Sponsored Reach Campaign', 'active']
+    ['OUT-SOCIAL-TG', 'Ethiopost Telegram & Social Media', 'Social', 'National & Diaspora', 'Digital Growth Partners', 'Kirubel Misrak', '+251 91 100 2233', 'Sponsored Reach Campaign', 'active'],
+    ['OUT-TIKVAH-TG', 'Tikvah Ethiopia (Telegram)', 'Social', 'National & Diaspora (2M+ Subscribers)', 'Tikvah Ethiopia Media Group', 'Tikvah Ad Desk', '+251 91 199 8877', '3-Month Sponsored Posts & Pinned Channel Feeds', 'active']
   ];
 
   for (const o of outlets) {
@@ -229,6 +230,8 @@ export function seedDatabase() {
   insertPlacement.run('PLC-2026-VPB-SCR-SHIROMEDA', vpbCampId, 'OUT-SCR-SHIROMEDA', 'Virtual P.O. Box Digital Screen (Shiromeda)', '15s Prime Loop LED Screen Flight', 'ETH-VPB-LED-2026', '2026-11-20', '2027-02-20', 90, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Digital screen flight verified on Shiromeda commercial corridor LED.', 'Continuous 15s High-Frequency Loop');
   insertPlacement.run('PLC-2026-VPB-SCR-DIRE-DAWA', vpbCampId, 'OUT-SCR-DIRE-DAWA', 'Virtual P.O. Box Digital Screen (Dire Dawa)', '15s Prime Loop LED Screen Flight', 'ETH-VPB-LED-2026', '2026-11-20', '2027-02-20', 90, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Digital screen flight verified on Dire Dawa regional city LED.', 'Continuous 15s High-Frequency Loop');
   insertPlacement.run('PLC-2026-VPB-SCR-ADEY-ABEBA', vpbCampId, 'OUT-SCR-ADEY-ABEBA', 'Virtual P.O. Box Digital Screen (Adey Abeba Stadium)', '15s Prime Loop LED Screen Flight', 'ETH-VPB-LED-2026', '2026-11-20', '2027-02-20', 90, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Digital screen flight verified on Adey Abeba Stadium LED screen.', 'Continuous 15s High-Frequency Loop');
+  // Virtual P.O. Box 3-Month Tikvah Telegram Campaign (Oct 1, 2026 -> Dec 31, 2026)
+  insertPlacement.run('PLC-2026-VPB-TIKVAH-TG', vpbCampId, 'OUT-TIKVAH-TG', 'Virtual P.O. Box Tikvah Telegram Sponsored Flight', 'Sponsored Posts & Pinned Channel Feeds', 'ETH-VPB-TIKVAH-2026', '2026-10-01', '2026-12-31', 90, 56, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Verified on Tikvah Ethiopia official Telegram channel (@tikvahethiopia) with daily sponsored pinned posts and broadcast links.', 'Daily Prime Broadcast Feeds & Pinned Messages');
 
   // DFS 7-Languages Radio Flights
   insertPlacement.run('PLC-2026-DFS-FANA-AA', dfsCampId, 'OUT-FANA-FM', 'DFS Radio Ad - 7 Languages (Addis Ababa)', 'Drive Time Radio Flight', 'ETH-DFS-FANAFM-2026', '2026-11-03', '2026-12-03', 60, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Fana FM 98.1 broadcast flight active in multi-language rotations.', 'Daily Morning & Evening Drive Rotations');

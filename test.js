@@ -281,6 +281,14 @@ async function runTestSuite() {
     assert(bikeAd.status === 'Completed', 'Bike Advertisement status is strictly Completed');
     assert(bikeAd.isExpired === true, 'Bike Advertisement isExpired flag evaluates to true');
 
+    const activeAdsRes = await makeRequest('GET', '/api/advertisements?status=Active', authHeader);
+    assert(activeAdsRes.statusCode === 200, 'GET /api/advertisements?status=Active responded 200 OK');
+    const tikvahAd = activeAdsRes.json.find(p => p.id === 'PLC-2026-VPB-TIKVAH-TG');
+    assert(tikvahAd !== undefined, 'Tikvah Telegram 3-month ad flight is registered');
+    assert(tikvahAd.status === 'Active', 'Tikvah Telegram ad status is Active');
+    assert(tikvahAd.outlet_name === 'Tikvah Ethiopia (Telegram)', 'Tikvah Telegram outlet correctly associated');
+    assert(tikvahAd.isExpired === false, 'Tikvah Telegram isExpired is false (flight active through Dec 31)');
+
     console.log('\n================================================================');
     console.log('  ALL INTEGRATION VERIFICATION CHECKS PASSED SUCCESSFULLY!       ');
     console.log('================================================================\n');
