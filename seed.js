@@ -54,6 +54,7 @@ export function seedDatabase() {
     ['OUT-SHEGER-FM', 'Sheger FM 102.1', 'Radio', 'Addis Ababa & Oromia', 'Sheger Radio Media', 'Meaza Birru', '+251 11 661 1021', 'Evening Commute: ETB 1,500/spot', 'active'],
     ['OUT-MESKEL-SCREEN', 'Meskel Square LED Mega-Screen', 'Digital Screen', 'Addis Ababa Metro', 'City Light Ad Network', 'Yared Hailu', '+251 91 120 4455', '15s Loop, 180x/day: ETB 180,000/mo', 'active'],
     ['OUT-BOLE-UNIPOLE', 'Bole Airport Road Unipole #4', 'Billboard', 'Addis Ababa', 'Horizon Outdoor Ads', 'Tewodros Assefa', '+251 91 140 7788', 'Illuminated Double-sided: ETB 120,000/mo', 'active'],
+    ['OUT-BIKE-TOUR', 'Addis City Bike Advertising & Promo Tour Fleet', 'Transit', 'Addis Ababa Metro', 'City Bike Promo Network', 'Tewodros Girma', '+251 91 188 4400', 'Mobile Street Tour & Brand Caravan', 'active'],
     ['OUT-ANBESSA-BUS', 'Anbessa City Bus Fleet #10', 'Transit', 'Greater Addis Ababa', 'Anbessa Transport Enterprise', 'Getachew Mengistu', '+251 11 442 1100', 'Full Back Wrap: ETB 25,000/bus/mo', 'active'],
     ['OUT-LRT-TRAIN', 'Addis Ababa Light Rail Transit', 'Transit', 'East-West & North-South Lines', 'ERC Transit Advertising', 'Solomon Tadesse', '+251 11 654 3210', 'Train Exterior Full Wrap: ETB 85,000/train', 'active'],
     ['OUT-SOCIAL-TG', 'Ethiopost Telegram & Social Media', 'Social', 'National & Diaspora', 'Digital Growth Partners', 'Kirubel Misrak', '+251 91 100 2233', 'Sponsored Reach Campaign', 'active']
@@ -122,16 +123,16 @@ export function seedDatabase() {
     'Virtual P.O. Box Nationwide Launch & Adoption Campaign',
     'vpb',
     'Nationwide registration and onboarding of citizens and businesses to digital Virtual P.O. Box mailboxes.',
-    'Multi-channel promotional campaign integrating nationwide outdoor branch activations, prime TV & radio commercial flights, and targeted social media marketing.',
+    'Multi-channel promotional campaign integrating nationwide outdoor branch activations, prime TV & radio commercial flights, bicycle street promo tours, 3-month digital LED mega-screen displays, and targeted social media marketing.',
     'All Ethiopian citizens, SMEs, corporates, and diaspora community',
     'National',
     '2026-10-01',
-    '2026-11-30',
+    '2027-02-20',
     'FY2026/27',
     'Kirubel Misrak',
     0,
     0,
-    JSON.stringify(['Television', 'Radio', 'Billboard', 'Social']),
+    JSON.stringify(['Television', 'Radio', 'Billboard', 'Digital Screen', 'Transit', 'Social']),
     250000,
     184500,
     15000000,
@@ -185,7 +186,9 @@ export function seedDatabase() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     insertAct.run(vpbCampId, 'Nationwide Outdoor & Branch Activations', 'Field Activation', 'In Progress', 'Kirubel Misrak', '2026-11-30', 0, 'Ground marketing roadshows and registration kiosks at major post offices.');
+    insertAct.run(vpbCampId, 'Bicycle Street Advertising City Tour', 'Field Activation', 'Completed', 'Kirubel Misrak', '2026-11-20', 0, '1-month branded bicycle caravan tour conducted across Addis Ababa key corridors.');
     insertAct.run(vpbCampId, 'TV & Radio 56s Commercial Broadcast Flights', 'Media Booking', 'Completed', 'Kirubel Misrak', '2026-11-20', 0, '1-month flights secured on Fana TV, Fana FM, Abay TV, Hagere TV, and Addis TV.');
+    insertAct.run(vpbCampId, 'Meskel Square LED Mega-Screen 3-Month Display', 'Media Booking', 'In Progress', 'Kirubel Misrak', '2027-02-20', 0, '3-month continuous digital screen placement running Nov 20 to Feb 20.');
     insertAct.run(vpbCampId, 'Digital & Social Media Acquisition Campaign', 'Creative Production', 'In Progress', 'Kirubel Misrak', '2026-11-30', 0, 'Sponsored Telegram promotions, social media video ads, and online tutorials.');
     insertAct.run(vpbCampId, 'Broadcast Compliance & Proof Verification Audit', 'Compliance & Audit', 'In Progress', 'Kirubel Misrak', '2026-11-25', 0, 'Transmission certificate audits and proof verification with broadcasters.');
   }
@@ -202,12 +205,14 @@ export function seedDatabase() {
     )
   `);
 
-  // Virtual P.O. Box 56s Flights
+  // Virtual P.O. Box Flights
   insertPlacement.run('PLC-2026-VPB-FANA-TV', vpbCampId, 'OUT-FANA-TV', 'Virtual P.O. Box 56s TV Commercial', 'Prime Time Broadcast Flight', 'ETH-VPB-FANA-TV-2026', '2026-10-24', '2026-11-20', 30, 12, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Fana TV prime broadcast transmission certificate verified.', 'Evening Prime Rotations');
   insertPlacement.run('PLC-2026-VPB-FANA-FM', vpbCampId, 'OUT-FANA-FM', 'Virtual P.O. Box 56s Radio Commercial', 'Drive Time Radio Flight', 'ETH-VPB-FANA-FM-2026', '2026-10-24', '2026-11-20', 30, 12, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Fana FM 98.1 transmission log and daily airtimes certified.', 'Drive Time Morning & Evening');
   insertPlacement.run('PLC-2026-VPB-ABAY-TV', vpbCampId, 'OUT-ABAY-TV', 'Virtual P.O. Box 56s TV Commercial', 'Broadcast Flight', 'ETH-VPB-ABAY-2026', '2026-10-25', '2026-11-24', 30, 11, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Abay TV 1-month flight agreement active and verified.', 'Daily Broadcast Rotations');
   insertPlacement.run('PLC-2026-VPB-HAGERE-TV', vpbCampId, 'OUT-HAGERE-TV', 'Virtual P.O. Box 56s TV Commercial', 'Broadcast Flight', 'ETH-VPB-HAGERE-2026', '2026-10-25', '2026-11-24', 30, 11, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Hagere TV flight transmission certificate certified.', 'Daily Broadcast Rotations');
   insertPlacement.run('PLC-2026-VPB-ADDIS-TV', vpbCampId, 'OUT-ADDIS-TV', 'Virtual P.O. Box 56s TV Commercial', 'Prime Time Broadcast Flight', 'ETH-VPB-ADDIS-2026', '2026-10-25', '2026-11-24', 30, 11, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Addis TV broadcast proof and airing log certified.', 'Prime Time News & Info Slots');
+  insertPlacement.run('PLC-2026-VPB-BIKE-TOUR', vpbCampId, 'OUT-BIKE-TOUR', 'Virtual P.O. Box Bike Advertisement City Tour', 'Mobile Street Tour & Activation', 'ETH-VPB-BIKE-2026', '2026-10-20', '2026-11-20', 30, 30, 0, 0, 'Completed', 'Verified', 'Kirubel Misrak', '1-month city-wide bike promotional tour conducted and verified across Addis Ababa corridors.', 'Daily Mobile Street Caravan');
+  insertPlacement.run('PLC-2026-VPB-MESKEL-LED', vpbCampId, 'OUT-MESKEL-SCREEN', 'Virtual P.O. Box Digital LED Mega-Screen Commercial', '15s Prime Loop LED Screen Flight', 'ETH-VPB-LED-2026', '2026-11-20', '2027-02-20', 90, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Digital screen flight active at Meskel Square with verified playback transmission logs.', 'Continuous 15s High-Frequency Loop');
 
   // DFS 7-Languages Radio Flights
   insertPlacement.run('PLC-2026-DFS-FANA-AA', dfsCampId, 'OUT-FANA-FM', 'DFS Radio Ad - 7 Languages (Addis Ababa)', 'Drive Time Radio Flight', 'ETH-DFS-FANAFM-2026', '2026-11-03', '2026-12-03', 60, 6, 0, 0, 'Active', 'Verified', 'Kirubel Misrak', 'Fana FM 98.1 broadcast flight active in multi-language rotations.', 'Daily Morning & Evening Drive Rotations');
